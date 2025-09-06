@@ -151,6 +151,44 @@
             display: flex;
             gap: 0.5rem;
         }
+        
+        /* [DIKEMASKINI] Gaya untuk butang skala penilaian */
+        .rating-group .btn {
+            flex: 1; /* Supaya semua butang sama besar */
+            background-color: #e9ecef; /* Warna asal butang (tidak dipilih) */
+            color: var(--secondary-color);
+            border: 1px solid #dee2e6;
+            margin-top: 0;
+        }
+        .rating-group .btn:hover {
+            background-color: #dde2e7; /* Warna ketika tetikus di atasnya */
+        }
+        .rating-group .btn.selected {
+            background-color: var(--primary-color); /* Warna apabila dipilih */
+            color: white;
+            border-color: var(--primary-color);
+        }
+        
+        /* [BARU] Gaya untuk kotak kriteria */
+        .criteria-box {
+            background-color: #f8f9fa;
+            border: 1px solid #e9ecef;
+            padding: 1.5rem;
+            border-radius: 8px;
+            margin-bottom: 2rem;
+            font-size: 0.9rem;
+            line-height: 1.5;
+        }
+        .criteria-box p {
+            margin: 0 0 0.5rem 0;
+        }
+        .criteria-box p:last-child {
+            margin-bottom: 0;
+        }
+        .criteria-box strong {
+            color: var(--text-color);
+        }
+
     </style>
 </head>
 <body>
@@ -274,7 +312,7 @@
                     </td>
                     <td>
                         <div class="rating-group" data-member-id="${member.noKP}">
-                            ${[1,2,3,4,5].map(n => `<button class="btn btn-secondary">${n}</button>`).join('')}
+                            ${[1,2,3,4,5].map(n => `<button class="btn">${n}</button>`).join('')}
                         </div>
                     </td>
                 </tr>
@@ -282,12 +320,24 @@
 
             appContainer.innerHTML = `
                 <h2>Langkah 1: Penilaian Jawatankuasa Tertinggi</h2>
-                <h3>Sila nilai prestasi pengurusan mereka secara keseluruhan.</h3>
+                
+                <div class="criteria-box">
+                    <p><strong>Skala Penilaian:</strong></p>
+                    <p><strong>1 (Sangat Lemah):</strong> Gagal memimpin, organisasi lemah, komunikasi tidak berkesan.</p>
+                    <p><strong>2 (Lemah):</strong> Arah tuju kurang jelas, pengurusan kurang memuaskan.</p>
+                    <p><strong>3 (Sederhana):</strong> Mampu menguruskan program pada tahap asas.</p>
+                    <p><strong>4 (Baik):</strong> Kepimpinan yang baik, program terurus, dan komunikasi jelas.</p>
+                    <p><strong>5 (Cemerlang):</strong> Kepimpinan luar biasa, pengurusan teratur, proaktif, dan telus.</p>
+                </div>
+
                 <table class="evaluation-table">${tableRows}</table>
                 <button id="nextStepBtn" class="btn">Seterusnya</button>
                 <p id="message" class="message error"></p>
             `;
-             document.getElementById('nextStepBtn').addEventListener('click', handleTopCommitteeSubmit);
+             
+            const table = appContainer.querySelector('.evaluation-table');
+            table.addEventListener('click', handleRatingClick);
+            document.getElementById('nextStepBtn').addEventListener('click', handleTopCommitteeSubmit);
         }
 
         function renderOwnCommitteeEvaluationScreen() {
@@ -316,7 +366,6 @@
         // FUNGSI-FUNGSI PENGENDALI (HANDLER)
         // =================================================================================
         async function handleStudentLogin() {
-            // [DIKEMASKINI] Menambah .trim() untuk membuang ruang kosong
             const noKPInput = document.getElementById('noKP').value.replace(/-/g, '').trim();
             const message = document.getElementById('message');
             
@@ -326,7 +375,6 @@
                 return;
             }
             
-            // [DIKEMASKINI] Menambah log untuk tujuan diagnostik
             console.log(`Mencuba log masuk dengan No. KP: [${noKPInput}]`);
 
             try {
@@ -395,7 +443,6 @@
                     let count = 0;
                     console.log("--- Memulakan Proses Muat Naik ---");
                     for (const student of jsonData) {
-                        // [DIKEMASKINI] Menambah .trim() untuk membersihkan data dari Excel
                         const noKP = String(student["No. KP"] || '').replace(/[^0-9]/g, '').trim();
                         
                         if (!noKP) {
@@ -403,7 +450,6 @@
                             continue;
                         }
                         
-                        // [DIKEMASKINI] Menambah log untuk setiap pelajar yang dimuat naik
                         console.log(`Memuat naik data untuk No. KP (ID Dokumen): [${noKP}]`);
 
                         const studentDoc = {
@@ -453,11 +499,49 @@
 
             renderTopCommitteeEvaluationScreen();
         }
+
+        function handleRatingClick(event) {
+            if (!event.target.matches('.rating-group .btn')) return;
+
+            const clickedButton = event.target;
+            const ratingGroup = clickedButton.parentElement;
+            const memberId = ratingGroup.dataset.memberId;
+            const score = parseInt(clickedButton.textContent, 10);
+
+            ratingGroup.querySelectorAll('.btn').forEach(btn => btn.classList.remove('selected'));
+            clickedButton.classList.add('selected');
+
+            evaluationState.answers.topCommittee[memberId] = score;
+            console.log(`Rating dikemas kini untuk ${memberId}: ${score}`);
+        }
         
-        function handleTopCommitteeSubmit() {
-            // Logik untuk menyimpan data Langkah 1 dan beralih ke Langkah 2
-            console.log("Menyimpan data JKT & teruskan ke Langkah 2");
-            renderOwnCommitteeEvaluationScreen();
+        async function handleTopCommitteeSubmit() {
+            const { topCommitteeMembers, answers, currentUser } = evaluationState;
+            const message = document.getElementById('message');
+
+            if (Object.keys(answers.topCommittee).length < topCommitteeMembers.length) {
+                message.textContent = "Sila berikan penilaian kepada semua ahli Jawatankuasa Tertinggi.";
+                message.style.display = 'block';
+                return;
+            }
+            
+            message.style.display = 'none';
+
+            try {
+                const docRef = doc(db, "penilaian", currentUser.noKP);
+                await setDoc(docRef, { 
+                    penilai: { noKP: currentUser.noKP, nama: currentUser.namaPelajar },
+                    penilaianJKT: answers.topCommittee 
+                }, { merge: true });
+
+                console.log("Penilaian JKT berjaya disimpan ke Firebase.");
+                renderOwnCommitteeEvaluationScreen();
+
+            } catch (error) {
+                console.error("Ralat menyimpan penilaian JKT:", error);
+                message.textContent = "Gagal menyimpan data penilaian. Sila cuba lagi.";
+                message.style.display = 'block';
+            }
         }
         
         async function fetchAllStudents() {
