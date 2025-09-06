@@ -2,25 +2,114 @@
 <html lang="ms">
 <head>
     <meta charset="UTF-8">
-    <title>Pemuat Naik Data ke Firebase</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistem Penilaian Rakan Sebaya</title>
+    <!-- 1. FONT DARI GOOGLE FONTS -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+    
+    <!-- Pustaka untuk membaca fail Excel -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    
+    <!-- 2. GAYA CSS TERUS DI DALAM HTML -->
     <style>
-        body { font-family: Arial, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; flex-direction: column; background-color: #f0f2f5; }
-        button { padding: 15px 30px; font-size: 1.2rem; cursor: pointer; background-color: #4CAF50; color: white; border: none; border-radius: 5px; }
-        p { font-size: 1.1rem; color: #333; }
+        :root {
+            --primary-color: #007bff;
+            --primary-hover: #0056b3;
+            --secondary-color: #6c757d;
+            --secondary-hover: #5a6268;
+            --background-color: #f4f7f6;
+            --card-background: #ffffff;
+            --text-color: #333;
+            --label-color: #555;
+            --border-color: #ccc;
+            --error-color: #dc3545;
+            --success-color: #28a745;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--background-color);
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 1rem;
+            box-sizing: border-box;
+        }
+
+        #app {
+            width: 100%;
+            max-width: 450px;
+            background-color: var(--card-background);
+            padding: 2.5rem;
+            border-radius: 12px;
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
+            transition: all 0.3s ease-in-out;
+        }
+        
+        .form-group input[type="file"] {
+            padding: 0.5rem;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 0.9rem;
+            border: none;
+            border-radius: 8px;
+            background-color: var(--primary-color);
+            color: white;
+            font-size: 1rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+            margin-top: 0.5rem;
+        }
+
+        .btn:hover {
+            background-color: var(--primary-hover);
+        }
+
+        .btn-secondary {
+            background-color: var(--secondary-color);
+        }
+        .btn-secondary:hover {
+            background-color: var(--secondary-hover);
+        }
+        
+        .message {
+            text-align: center;
+            margin-top: 1rem;
+            padding: 0.75rem;
+            border-radius: 8px;
+            display: none; /* Disembunyikan secara lalai */
+        }
+        .message.error {
+            color: var(--error-color);
+            background-color: rgba(220, 53, 69, 0.1);
+        }
+        .message.success {
+            color: var(--success-color);
+            background-color: rgba(40, 167, 69, 0.1);
+        }
     </style>
 </head>
 <body>
+    
+    <div id="app">
+        <!-- Kandungan aplikasi akan dimuatkan di sini oleh JavaScript -->
+    </div>
 
-    <h1>Alat Pemuat Naik Data Pelajar</h1>
-    <p>Hanya untuk kegunaan Admin. Klik butang di bawah untuk memulakan proses.</p>
-    <button id="uploadBtn">Muat Naik Data Pelajar ke Firebase</button>
-    <p id="status"></p>
-
+    <!-- 3. SKRIP FIREBASE DAN LOGIK APLIKASI -->
     <script type="module">
+        // Import fungsi yang diperlukan dari Firebase SDK
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js";
-        import { getFirestore, collection, doc, setDoc } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
+        import { getFirestore, collection, getDocs, doc, setDoc } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
+        import { getAnalytics } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-analytics.js";
 
-        // Konfigurasi Firebase anda
+        // Konfigurasi Firebase Anda
         const firebaseConfig = {
             apiKey: "AIzaSyA7oRO1-G8zhIp6eHNLcDpw0oNGcMBPxoE",
             authDomain: "penilaiankumpulan.firebaseapp.com",
@@ -34,58 +123,226 @@
         // Inisialisasi Firebase
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
+        const analytics = getAnalytics(app);
+        console.log("Firebase berjaya dihubungkan!");
 
-        // DATA PELAJAR DARI FAIL EXCEL ANDA
-        const studentData = [
-            { no: 1, namaPelajar: "IZZATUL HANAN BINTI MOHAMAD", noKP: "000913020090", aGiliran: "2024182400001", kelas: "BAMB(R)", kumpulan: "CHARLIE", AJK: "" },
-            { no: 2, namaPelajar: "AMIR SIRHAN BIN AHMAD", noKP: "970325025757", aGiliran: "2024182400002", kelas: "BAMB(R)", kumpulan: "BRAVO", AJK: "" },
-            { no: 3, namaPelajar: "MEGAT MUHAMMAD AIMAN BIN MOHD FAUZI", noKP: "960919025069", aGiliran: "2024182400003", kelas: "BAMB(R)", kumpulan: "ALPHA", AJK: "PENGERUSI" },
-            { no: 4, namaPelajar: "NAWAL AWATIF BINTI ZULKIFLI", noKP: "951120025282", aGiliran: "2024182400004", kelas: "BAMB(R)", kumpulan: "BRAVO", AJK: "" },
-            { no: 5, namaPelajar: "NOR JANNAH BINTI AHMAD", noKP: "930303025872", aGiliran: "2024182400005", kelas: "BAMB(R)", kumpulan: "DELTA", AJK: "" },
-            { no: 6, namaPelajar: "NORAINI AZIAN BINTI AZMI", noKP: "960619025796", aGiliran: "2024182400006", kelas: "BAMB(R)", kumpulan: "SIERRA", AJK: "" },
-            { no: 7, namaPelajar: "NUR ALINA BINTI ABDUL RAHIM", noKP: "931230025998", aGiliran: "2024182400007", kelas: "BAMB(R)", kumpulan: "ALPHA", AJK: "NAIB PENGERUSI" },
-            // ... (Saya telah memasukkan semua 74 pelajar di sini, tetapi memendekkannya untuk paparan)
-            // Data penuh ada dalam kod sebenar
-            { no: 58, namaPelajar: "NOR SHAFIRAH BINTI MOHD ZIN", noKP: "980118106422", aGiliran: "2024182390031", kelas: "BMMB(R) PJJ (BM2)", kumpulan: "CHARLIE", AJK: "SETIAUSAHA" },
-            { no: 59, namaPelajar: "NOR SHAMERA BINTI IBRAHIM", noKP: "900411086106", aGiliran: "2024182390032", kelas: "BMMB(R) PJJ (BM2)", kumpulan: "ALPHA", AJK: "" },
-            { no: 60, namaPelajar: "NORATHIRAH BINTI MOHAMAD DESA", noKP: "931114095008", aGiliran: "2024182390033", kelas: "BMMB(R) PJJ (BM2)", kumpulan: "TANGO", AJK: "" },
-            { no: 61, namaPelajar: "NUR AISYAH BINTI MOHD ZULKAFLI", noKP: "991115026092", aGiliran: "2024182390034", kelas: "BMMB(R) PJJ (BM2)", kumpulan: "ECHO", AJK: "" },
-            { no: 62, namaPelajar: "NUR AZLINA BINTI BATIAR APANDI", noKP: "000712010486", aGiliran: "2024182390035", kelas: "BMMB(R) PJJ (BM2)", kumpulan: "TANGO", AJK: "" },
-            { no: 63, namaPelajar: "NUR HAZWANI BINTI RAMLEE", noKP: "941208015434", aGiliran: "2024182390036", kelas: "BMMB(R) PJJ (BM2)", kumpulan: "BRAVO", AJK: "" },
-            { no: 64, namaPelajar: "NUR RASYIDAH BINTI RAMLI", noKP: "941018025732", aGiliran: "2024182390037", kelas: "BMMB(R) PJJ (BM2)", kumpulan: "BRAVO", AJK: "" }
-        ];
+        // =================================================================================
+        // DATA PELAJAR (KINI AKAN DIMUAT NAIK DARI FAIL)
+        // =================================================================================
+        // const studentData = [ ... ]; // Data ini tidak lagi diperlukan di sini.
 
+        const appContainer = document.getElementById('app');
 
-        async function uploadData() {
-            const statusEl = document.getElementById('status');
-            const uploadBtn = document.getElementById('uploadBtn');
-            uploadBtn.disabled = true;
-            statusEl.textContent = "Memuat naik data... Sila tunggu...";
+        // =================================================================================
+        // FUNGSI-FUNGSI PAPARAN (RENDER)
+        // =================================================================================
 
-            const collectionRef = collection(db, "pelajar");
-            let count = 0;
-
-            for (const student of studentData) {
-                try {
-                    // Gunakan No. KP sebagai ID unik untuk setiap dokumen
-                    const docRef = doc(collectionRef, student.noKP);
-                    // Bersihkan noKP dengan membuang tanda '-'
-                    const cleanedStudent = { ...student, noKP: student.noKP.replace(/-/g, '') };
-                    await setDoc(docRef, cleanedStudent);
-                    count++;
-                } catch (error) {
-                    console.error("Ralat semasa memuat naik data untuk:", student.namaPelajar, error);
-                    statusEl.textContent = `Gagal memuat naik data untuk ${student.namaPelajar}. Sila semak konsol.`;
-                    uploadBtn.disabled = false;
-                    return;
-                }
-            }
-
-            statusEl.textContent = `Selesai! ${count} rekod pelajar telah berjaya dimuat naik.`;
-            console.log(`Selesai! ${count} rekod pelajar telah berjaya dimuat naik.`);
+        // 1. Paparan Pemilihan Peranan (Mula di sini)
+        function renderRoleSelectionScreen() {
+            appContainer.innerHTML = `
+                <h1>Selamat Datang</h1>
+                <h2>Sila pilih peranan anda:</h2>
+                <button id="studentBtn" class="btn">Saya Pelajar</button>
+                <button id="adminBtn" class="btn btn-secondary">Saya Admin</button>
+            `;
+            document.getElementById('studentBtn').addEventListener('click', renderStudentLoginScreen);
+            document.getElementById('adminBtn').addEventListener('click', renderAdminLoginScreen);
         }
 
-        document.getElementById('uploadBtn').addEventListener('click', uploadData);
+        // 2. Paparan Log Masuk Pelajar
+        function renderStudentLoginScreen() {
+            appContainer.innerHTML = `
+                <h2>Log Masuk Pelajar</h2>
+                <div class="form-group">
+                    <label for="noKP">No. Kad Pengenalan (tanpa '-')</label>
+                    <input type="text" id="noKP" placeholder="Contoh: 980101101234">
+                </div>
+                <button id="loginBtn" class="btn">Log Masuk</button>
+                <button id="backBtn" class="btn btn-secondary">Kembali</button>
+                <p id="message" class="message error"></p>
+            `;
+            document.getElementById('loginBtn').addEventListener('click', handleStudentLogin);
+            document.getElementById('backBtn').addEventListener('click', renderRoleSelectionScreen);
+        }
+        
+        // 3. Paparan Log Masuk Admin
+        function renderAdminLoginScreen() {
+            appContainer.innerHTML = `
+                <h2>Log Masuk Admin</h2>
+                <div class="form-group">
+                    <label for="adminPass">Kata Laluan</label>
+                    <input type="password" id="adminPass">
+                </div>
+                <button id="adminLoginBtn" class="btn">Log Masuk</button>
+                <button id="backBtn" class="btn btn-secondary">Kembali</button>
+                <p id="message" class="message error"></p>
+            `;
+            document.getElementById('adminLoginBtn').addEventListener('click', handleAdminLogin);
+            document.getElementById('backBtn').addEventListener('click', renderRoleSelectionScreen);
+        }
+
+        // 4. Papan Pemuka Admin
+        function renderAdminDashboard() {
+            appContainer.innerHTML = `
+                <h2>Papan Pemuka Admin</h2>
+                <p>Pilih fail Excel (.xlsx) yang mengandungi data pelajar untuk dimuat naik.</p>
+                <div class="form-group">
+                    <label for="excelFile">Fail Data Pelajar</label>
+                    <input type="file" id="excelFile" accept=".xlsx, .xls, .csv" style="border: none;">
+                </div>
+                <button id="uploadBtn" class="btn">Muat Naik Data Pelajar</button>
+                <button id="logoutBtn" class="btn btn-secondary">Log Keluar</button>
+                <p id="message" class="message"></p>
+            `;
+            document.getElementById('uploadBtn').addEventListener('click', handleUploadData);
+            document.getElementById('logoutBtn').addEventListener('click', renderRoleSelectionScreen);
+        }
+
+        // 5. Paparan Selamat Datang Pelajar
+        function renderWelcomeScreen(user) {
+            appContainer.innerHTML = `
+                <h2>Selamat Datang,</h2>
+                <h1>${user.namaPelajar}</h1>
+                <p style="text-align: center;">Anda dari AJK: <strong>${user.AJK || 'Tidak Ditetapkan'}</strong></p>
+                <p style="text-align: center;">Sistem akan membawa anda ke halaman penilaian sebentar lagi.</p>
+                <button id="logoutBtn" class="btn btn-secondary">Log Keluar</button>
+            `;
+             document.getElementById('logoutBtn').addEventListener('click', renderRoleSelectionScreen);
+        }
+
+        // =================================================================================
+        // FUNGSI-FUNGSI PENGENDALI (HANDLER)
+        // =================================================================================
+
+        // Kendalikan Log Masuk Pelajar
+        async function handleStudentLogin() {
+            const noKPInput = document.getElementById('noKP').value.replace(/-/g, '');
+            const message = document.getElementById('message');
+            
+            if (!noKPInput) {
+                message.textContent = "Sila masukkan No. Kad Pengenalan.";
+                message.style.display = 'block';
+                return;
+            }
+
+            try {
+                const docRef = doc(db, "pelajar", noKPInput);
+                const docSnap = await getDoc(docRef);
+
+                if (docSnap.exists()) {
+                    const userFound = docSnap.data();
+                    console.log("Pengguna ditemui:", userFound);
+                    sessionStorage.setItem('loggedInUser', JSON.stringify(userFound));
+                    renderWelcomeScreen(userFound); 
+                } else {
+                    message.textContent = "No. Kad Pengenalan tidak wujud dalam rekod.";
+                    message.style.display = 'block';
+                }
+            } catch (error) {
+                console.error("Ralat semasa log masuk: ", error);
+                message.textContent = "Gagal berhubung dengan pangkalan data.";
+                message.style.display = 'block';
+            }
+        }
+        
+        // Kendalikan Log Masuk Admin
+        function handleAdminLogin() {
+            const pass = document.getElementById('adminPass').value;
+            const message = document.getElementById('message');
+            const ADMIN_PASSWORD = "admin123"; // Kata laluan admin - boleh ditukar
+
+            if (pass === ADMIN_PASSWORD) {
+                renderAdminDashboard();
+            } else {
+                message.textContent = "Kata laluan salah.";
+                message.style.display = 'block';
+            }
+        }
+        
+        // Kendalikan Muat Naik Data
+        async function handleUploadData() {
+            const fileInput = document.getElementById('excelFile');
+            const message = document.getElementById('message');
+            const uploadBtn = document.getElementById('uploadBtn');
+
+            if (fileInput.files.length === 0) {
+                message.textContent = "Sila pilih fail Excel terlebih dahulu.";
+                message.className = 'message error';
+                message.style.display = 'block';
+                return;
+            }
+
+            const file = fileInput.files[0];
+            const reader = new FileReader();
+
+            reader.onload = async function(event) {
+                uploadBtn.disabled = true;
+                message.textContent = "Memproses dan memuat naik data... Sila tunggu...";
+                message.className = 'message';
+                message.style.display = 'block';
+
+                try {
+                    const data = new Uint8Array(event.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    const firstSheetName = workbook.SheetNames[0];
+                    const worksheet = workbook.Sheets[firstSheetName];
+                    const jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
+                    
+                    if (jsonData.length === 0) {
+                        throw new Error("Fail Excel kosong atau format tidak betul.");
+                    }
+
+                    const collectionRef = collection(db, "pelajar");
+                    let count = 0;
+
+                    for (const student of jsonData) {
+                        // Pastikan No. KP wujud dan bersihkannya
+                        const noKP = String(student["No. KP"] || '').replace(/[^0-9]/g, '');
+                        if (!noKP) continue; // Langkau baris jika tiada No. KP
+
+                        const studentDoc = {
+                            namaPelajar: student["Nama Pelajar"] || "",
+                            noKP: noKP,
+                            aGiliran: String(student["A. Giliran"] || ''),
+                            kelas: student["Kelas"] || "",
+                            kumpulan: student["Kumpulan"] || "",
+                            AJK: student["AJK"] || ""
+                        };
+                        
+                        const docRef = doc(collectionRef, noKP);
+                        await setDoc(docRef, studentDoc);
+                        count++;
+                    }
+                    
+                    message.textContent = `Selesai! ${count} rekod pelajar berjaya dimuat naik.`;
+                    message.className = 'message success';
+                    console.log(`Selesai! ${count} rekod pelajar telah berjaya dimuat naik.`);
+
+                } catch (error) {
+                    console.error("Ralat memuat naik:", error);
+                    message.textContent = `Gagal memuat naik data. Semak format fail atau konsol untuk ralat.`;
+                    message.className = 'message error';
+                } finally {
+                    uploadBtn.disabled = false;
+                }
+            };
+
+            reader.onerror = function() {
+                message.textContent = "Gagal membaca fail.";
+                message.className = 'message error';
+                message.style.display = 'block';
+            };
+
+            reader.readAsArrayBuffer(file);
+        }
+
+        // =================================================================================
+        // MULAKAN APLIKASI
+        // =================================================================================
+        renderRoleSelectionScreen();
+
     </script>
 </body>
 </html>
+
+
