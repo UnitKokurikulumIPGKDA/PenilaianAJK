@@ -115,6 +115,11 @@
         .btn-secondary:hover {
             background-color: var(--secondary-hover);
         }
+
+        .btn:disabled {
+            background-color: #cdd2d7;
+            cursor: not-allowed;
+        }
         
         .message {
             text-align: center;
@@ -152,24 +157,22 @@
             gap: 0.5rem;
         }
         
-        /* [DIKEMASKINI] Gaya untuk butang skala penilaian */
         .rating-group .btn {
-            flex: 1; /* Supaya semua butang sama besar */
-            background-color: #e9ecef; /* Warna asal butang (tidak dipilih) */
+            flex: 1; 
+            background-color: #e9ecef; 
             color: var(--secondary-color);
             border: 1px solid #dee2e6;
             margin-top: 0;
         }
         .rating-group .btn:hover {
-            background-color: #dde2e7; /* Warna ketika tetikus di atasnya */
+            background-color: #dde2e7; 
         }
         .rating-group .btn.selected {
-            background-color: var(--primary-color); /* Warna apabila dipilih */
+            background-color: var(--primary-color); 
             color: white;
             border-color: var(--primary-color);
         }
         
-        /* [BARU] Gaya untuk kotak kriteria */
         .criteria-box {
             background-color: #f8f9fa;
             border: 1px solid #e9ecef;
@@ -203,7 +206,7 @@
         import { getFirestore, collection, getDoc, doc, setDoc, getDocs } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
         import { getAnalytics } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-analytics.js";
 
-        // Konfigurasi Firebase Anda (TELAH DIKEMASKINI)
+        // Konfigurasi Firebase Anda
         const firebaseConfig = {
             apiKey: "AIzaSyAVDe2JccI_u6yIdgtDHHmOVMnqfzc7oDA",
             authDomain: "penilaian-ajk.firebaseapp.com",
@@ -221,7 +224,6 @@
 
         const appContainer = document.getElementById('app');
         
-        // Data sementara untuk proses penilaian
         let evaluationState = {};
 
         // =================================================================================
@@ -340,14 +342,59 @@
             document.getElementById('nextStepBtn').addEventListener('click', handleTopCommitteeSubmit);
         }
 
-        function renderOwnCommitteeEvaluationScreen() {
-            // Logik untuk paparan Langkah 2 (akan dibina)
+        function renderPeerQuestionScreen() {
+            const { userCommitteeMembers, currentQuestionIndex } = evaluationState;
+            const question = evaluationQuestions[currentQuestionIndex];
+
+            if (userCommitteeMembers.length === 0) {
+                renderCompletionScreen();
+                return;
+            }
+
+            let tableRows = userCommitteeMembers.map(member => {
+                const savedScore = evaluationState.answers.ownCommittee[currentQuestionIndex]?.[member.noKP];
+                const ratingButtons = [1,2,3,4,5].map(n => 
+                    `<button class="btn ${savedScore === n ? 'selected' : ''}">${n}</button>`
+                ).join('');
+
+                return `
+                    <tr>
+                        <td><strong>${member.namaPelajar}</strong></td>
+                        <td>
+                            <div class="rating-group" data-member-id="${member.noKP}">
+                                ${ratingButtons}
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+
+            const isFirstQuestion = currentQuestionIndex === 0;
+            const isLastQuestion = currentQuestionIndex === evaluationQuestions.length - 1;
+
             appContainer.innerHTML = `
                 <h2>Langkah 2: Penilaian Rakan AJK</h2>
-                <h3>Ini adalah bahagian penilaian rakan AJK sendiri (dalam pembinaan).</h3>
-                <button id="finishBtn" class="btn">Selesai</button>
+                <h3>Soalan ${currentQuestionIndex + 1} daripada ${evaluationQuestions.length}</h3>
+                
+                <div class="criteria-box">
+                    <p><strong>Soalan:</strong></p>
+                    <p>${question}</p>
+                </div>
+
+                <table class="evaluation-table">${tableRows}</table>
+                
+                <div style="display: flex; gap: 1rem; margin-top: 1.5rem;">
+                    <button id="prevBtn" class="btn btn-secondary" ${isFirstQuestion ? 'disabled' : ''}>Sebelumnya</button>
+                    <button id="nextBtn" class="btn">${isLastQuestion ? 'Hantar Penilaian' : 'Seterusnya'}</button>
+                </div>
+                <p id="message" class="message error"></p>
             `;
-             document.getElementById('finishBtn').addEventListener('click', renderCompletionScreen);
+            
+            appContainer.querySelector('.evaluation-table').addEventListener('click', handlePeerRatingClick);
+            document.getElementById('nextBtn').addEventListener('click', handleNextQuestion);
+            if (!isFirstQuestion) {
+                document.getElementById('prevBtn').addEventListener('click', handlePrevQuestion);
+            }
         }
 
         function renderCompletionScreen() {
@@ -535,12 +582,82 @@
                 }, { merge: true });
 
                 console.log("Penilaian JKT berjaya disimpan ke Firebase.");
-                renderOwnCommitteeEvaluationScreen();
+                renderPeerQuestionScreen();
 
             } catch (error) {
                 console.error("Ralat menyimpan penilaian JKT:", error);
                 message.textContent = "Gagal menyimpan data penilaian. Sila cuba lagi.";
                 message.style.display = 'block';
+            }
+        }
+
+        function handlePeerRatingClick(event) {
+            if (!event.target.matches('.rating-group .btn')) return;
+
+            const clickedButton = event.target;
+            const ratingGroup = clickedButton.parentElement;
+            const memberId = ratingGroup.dataset.memberId;
+            const score = parseInt(clickedButton.textContent, 10);
+            const questionIndex = evaluationState.currentQuestionIndex;
+
+            ratingGroup.querySelectorAll('.btn').forEach(btn => btn.classList.remove('selected'));
+            clickedButton.classList.add('selected');
+
+            if (!evaluationState.answers.ownCommittee[questionIndex]) {
+                evaluationState.answers.ownCommittee[questionIndex] = {};
+            }
+            evaluationState.answers.ownCommittee[questionIndex][memberId] = score;
+            console.log(`Q${questionIndex} - Rating untuk ${memberId}: ${score}`);
+        }
+
+        function handleNextQuestion() {
+            const { currentQuestionIndex, userCommitteeMembers, answers } = evaluationState;
+            const message = document.getElementById('message');
+
+            const currentAnswers = answers.ownCommittee[currentQuestionIndex] || {};
+            if (Object.keys(currentAnswers).length < userCommitteeMembers.length) {
+                message.textContent = 'Sila berikan penilaian kepada semua ahli untuk soalan ini.';
+                message.style.display = 'block';
+                return;
+            }
+            message.style.display = 'none';
+
+            if (currentQuestionIndex === evaluationQuestions.length - 1) {
+                handleFinalSubmit();
+            } else {
+                evaluationState.currentQuestionIndex++;
+                renderPeerQuestionScreen();
+            }
+        }
+
+        function handlePrevQuestion() {
+            if (evaluationState.currentQuestionIndex > 0) {
+                evaluationState.currentQuestionIndex--;
+                renderPeerQuestionScreen();
+            }
+        }
+
+        async function handleFinalSubmit() {
+            appContainer.innerHTML = `<h2>Menyimpan semua data penilaian...</h2>`;
+            const { answers, currentUser } = evaluationState;
+
+            try {
+                const docRef = doc(db, "penilaian", currentUser.noKP);
+                await setDoc(docRef, { 
+                    penilaianAJK: answers.ownCommittee 
+                }, { merge: true });
+
+                console.log("Penilaian AJK berjaya disimpan ke Firebase.");
+                renderCompletionScreen();
+
+            } catch (error) {
+                console.error("Ralat menyimpan penilaian AJK:", error);
+                appContainer.innerHTML = `
+                    <h2>Gagal menyimpan data.</h2>
+                    <p>Sila cuba lagi atau hubungi admin.</p>
+                    <button id="retryBtn" class="btn">Cuba Semula</button>
+                `;
+                document.getElementById('retryBtn').addEventListener('click', handleFinalSubmit);
             }
         }
         
