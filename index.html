@@ -403,7 +403,11 @@
                     message.className = 'message success';
                 } catch (error) {
                     console.error("Ralat memuat naik:", error);
-                    message.textContent = `Gagal memuat naik data. Semak format fail.`;
+                    if (error.code === 'permission-denied') {
+                        message.textContent = 'Gagal: Akses ke pangkalan data disekat. Sila semak "Rules" di Firebase anda.';
+                    } else {
+                        message.textContent = `Galat semasa memuat naik. Sila semak format fail atau konsol untuk butiran.`;
+                    }
                     message.className = 'message error';
                 } finally {
                     uploadBtn.disabled = false;
@@ -454,4 +458,5 @@
     </script>
 </body>
 </html>
+
 
