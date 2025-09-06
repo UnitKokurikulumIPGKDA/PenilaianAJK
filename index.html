@@ -370,7 +370,9 @@
             const question = evaluationQuestions[currentQuestionIndex];
 
             if (userCommitteeMembers.length === 0) {
-                renderCompletionScreen();
+                // [PEMBETULAN] Jika tiada rakan AJK untuk dinilai, terus ke proses akhir.
+                console.log("Tiada rakan AJK untuk dinilai. Melengkapkan penilaian...");
+                handleFinalSubmit();
                 return;
             }
 
@@ -423,7 +425,7 @@
         function renderCompletionScreen() {
              appContainer.innerHTML = `
                 <h2>Terima Kasih!</h2>
-                <h3>Penilaian anda telah berjaya direkodkan.</h3>
+                <h3>Penilaian anda telah berjaya direkodkan. Anda boleh log keluar sekarang.</h3>
                 <button id="logoutBtn" class="btn">Log Keluar</button>
             `;
             document.getElementById('logoutBtn').addEventListener('click', () => {
@@ -530,22 +532,38 @@
             }
             
             try {
-                const docRef = doc(db, "pelajar", noKPInput);
-                const docSnap = await getDoc(docRef);
+                // Langkah 1: Semak jika pelajar wujud
+                const studentDocRef = doc(db, "pelajar", noKPInput);
+                const studentDocSnap = await getDoc(studentDocRef);
 
-                if (docSnap.exists()) {
-                    const userFound = docSnap.data();
-                    sessionStorage.setItem('loggedInUser', JSON.stringify(userFound));
-                    
-                    if (userFound.AJK && userFound.AJK.trim() !== "") {
-                        await startEvaluationFlow(userFound);
-                    } else {
-                        renderCommitteeSelectionScreen(userFound);
-                    }
-                } else {
+                if (!studentDocSnap.exists()) {
                     message.textContent = "No. Kad Pengenalan tidak wujud dalam rekod.";
                     message.style.display = 'block';
+                    return;
                 }
+                
+                const userFound = studentDocSnap.data();
+                sessionStorage.setItem('loggedInUser', JSON.stringify(userFound));
+
+                // Langkah 2: Semak jika penilaian sudah selesai
+                const evaluationDocRef = doc(db, "penilaian", noKPInput);
+                const evaluationDocSnap = await getDoc(evaluationDocRef);
+
+                if (evaluationDocSnap.exists() && evaluationDocSnap.data().penilaianAJK) {
+                    console.log("Pengguna ini telah melengkapkan penilaian. Terus ke skrin selesai.");
+                    renderCompletionScreen();
+                    return;
+                }
+
+                // Langkah 3: Jika belum selesai, semak jika AJK perlu dipilih
+                if (userFound.AJK && userFound.AJK.trim() !== "") {
+                    // AJK wujud, mulakan aliran penilaian
+                    await startEvaluationFlow(userFound);
+                } else {
+                    // AJK kosong, paparkan skrin pemilihan
+                    renderCommitteeSelectionScreen(userFound);
+                }
+
             } catch (error) {
                 console.error("Ralat semasa log masuk: ", error);
                 message.textContent = "Gagal berhubung dengan pangkalan data.";
@@ -917,4 +935,5 @@
     </script>
 </body>
 </html>
+
 
