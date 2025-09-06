@@ -42,7 +42,7 @@
 
         #app {
             width: 100%;
-            max-width: 450px;
+            max-width: 600px; /* Lebarkan sedikit untuk jadual penilaian */
             background-color: var(--card-background);
             padding: 2.5rem;
             border-radius: 12px;
@@ -50,6 +50,43 @@
             transition: all 0.3s ease-in-out;
         }
         
+        h1, h2, h3 {
+            text-align: center;
+            color: var(--text-color);
+            margin-top: 0;
+            font-weight: 700;
+        }
+        
+        h2 { margin-bottom: 0.5rem; }
+        h3 { margin-bottom: 1.5rem; font-weight: 400; color: var(--label-color); }
+
+        .form-group {
+            margin-bottom: 1.25rem;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: var(--label-color);
+            font-weight: 500;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 0.8rem 1rem;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            font-size: 1rem;
+            box-sizing: border-box;
+            transition: border-color 0.3s, box-shadow 0.3s;
+        }
+        
+        .form-group input:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.2);
+        }
+
         .form-group input[type="file"] {
             padding: 0.5rem;
         }
@@ -84,7 +121,7 @@
             margin-top: 1rem;
             padding: 0.75rem;
             border-radius: 8px;
-            display: none; /* Disembunyikan secara lalai */
+            display: none;
         }
         .message.error {
             color: var(--error-color);
@@ -94,50 +131,82 @@
             color: var(--success-color);
             background-color: rgba(40, 167, 69, 0.1);
         }
+
+        /* Gaya untuk Jadual Penilaian */
+        .evaluation-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1.5rem;
+        }
+        .evaluation-table th, .evaluation-table td {
+            text-align: left;
+            padding: 0.8rem;
+            border-bottom: 1px solid #eee;
+        }
+        .evaluation-table th {
+            font-weight: 500;
+            color: var(--label-color);
+        }
+        .rating-group {
+            display: flex;
+            gap: 0.5rem;
+        }
     </style>
 </head>
 <body>
     
     <div id="app">
-        <!-- Kandungan aplikasi akan dimuatkan di sini oleh JavaScript -->
+        <!-- Kandungan aplikasi akan dimuatkan di sini -->
     </div>
 
     <!-- 3. SKRIP FIREBASE DAN LOGIK APLIKASI -->
     <script type="module">
-        // Import fungsi yang diperlukan dari Firebase SDK
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js";
         import { getFirestore, collection, getDocs, doc, setDoc } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
         import { getAnalytics } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-analytics.js";
 
-        // Konfigurasi Firebase Anda
+        // Konfigurasi Firebase Anda (TELAH DIKEMASKINI)
         const firebaseConfig = {
-            apiKey: "AIzaSyA7oRO1-G8zhIp6eHNLcDpw0oNGcMBPxoE",
-            authDomain: "penilaiankumpulan.firebaseapp.com",
-            projectId: "penilaiankumpulan",
-            storageBucket: "penilaiankumpulan.appspot.com",
-            messagingSenderId: "288651360802",
-            appId: "1:288651360802:web:62f1e2fe94a387ca3fa87b",
-            measurementId: "G-12S4PCL2ED"
+            apiKey: "AIzaSyAVDe2JccI_u6yIdgtDHHmOVMnqfzc7oDA",
+            authDomain: "penilaian-ajk.firebaseapp.com",
+            projectId: "penilaian-ajk",
+            storageBucket: "penilaian-ajk.appspot.com",
+            messagingSenderId: "409815374539",
+            appId: "1:409815374539:web:e66da87200f959ae9d594e",
+            measurementId: "G-T7KZYS3W0Y"
         };
 
-        // Inisialisasi Firebase
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
         const analytics = getAnalytics(app);
-        console.log("Firebase berjaya dihubungkan!");
-
-        // =================================================================================
-        // DATA PELAJAR (KINI AKAN DIMUAT NAIK DARI FAIL)
-        // =================================================================================
-        // const studentData = [ ... ]; // Data ini tidak lagi diperlukan di sini.
+        console.log("Firebase berjaya dihubungkan dengan projek 'penilaian-ajk'!");
 
         const appContainer = document.getElementById('app');
+        
+        // Data sementara untuk proses penilaian
+        let evaluationState = {};
+
+        // =================================================================================
+        // SOALAN-SOALAN PENILAIAN
+        // =================================================================================
+        const evaluationQuestions = [
+            // Fasa 1
+            "Sejauh manakah ahli ini terlibat secara aktif dalam sesi perbincangan dan menyumbang kepada perancangan tugas AJK?",
+            "Adakah ahli ini menunjukkan inisiatif dalam mencadangkan idea atau mengambil tanggungjawab tanpa perlu disuruh?",
+            "Sejauh manakah ahli ini berkomunikasi dengan jelas dan berkesan dengan ahli lain semasa fasa perancangan?",
+            // Fasa 2
+            "Adakah ahli ini melaksanakan tugas yang diamanahkan dengan cekap dan penuh tanggungjawab semasa aktiviti berlangsung?",
+            "Sejauh manakah keupayaan ahli ini untuk kekal tenang dan membantu menyelesaikan sebarang masalah yang timbul secara tiba-tiba?",
+            "Adakah ahli ini bekerjasama dengan baik, sedia membantu rakan lain, dan mengekalkan komunikasi yang positif?",
+            "Adakah ahli ini menunjukkan sikap yang positif dan menjadi pendorong semangat kepada ahli AJK yang lain?",
+            // Fasa 3
+            "Adakah ahli ini turut serta dan komited dalam menyelesaikan tugasan selepas aktiviti (cth: mengemas)?",
+            "Sejauh manakah ahli ini menyumbang dalam sesi post-mortem serta terbuka untuk memberi dan menerima maklum balas?"
+        ];
 
         // =================================================================================
         // FUNGSI-FUNGSI PAPARAN (RENDER)
         // =================================================================================
-
-        // 1. Paparan Pemilihan Peranan (Mula di sini)
         function renderRoleSelectionScreen() {
             appContainer.innerHTML = `
                 <h1>Selamat Datang</h1>
@@ -149,7 +218,6 @@
             document.getElementById('adminBtn').addEventListener('click', renderAdminLoginScreen);
         }
 
-        // 2. Paparan Log Masuk Pelajar
         function renderStudentLoginScreen() {
             appContainer.innerHTML = `
                 <h2>Log Masuk Pelajar</h2>
@@ -165,9 +233,8 @@
             document.getElementById('backBtn').addEventListener('click', renderRoleSelectionScreen);
         }
         
-        // 3. Paparan Log Masuk Admin
         function renderAdminLoginScreen() {
-            appContainer.innerHTML = `
+             appContainer.innerHTML = `
                 <h2>Log Masuk Admin</h2>
                 <div class="form-group">
                     <label for="adminPass">Kata Laluan</label>
@@ -181,7 +248,6 @@
             document.getElementById('backBtn').addEventListener('click', renderRoleSelectionScreen);
         }
 
-        // 4. Papan Pemuka Admin
         function renderAdminDashboard() {
             appContainer.innerHTML = `
                 <h2>Papan Pemuka Admin</h2>
@@ -198,23 +264,57 @@
             document.getElementById('logoutBtn').addEventListener('click', renderRoleSelectionScreen);
         }
 
-        // 5. Paparan Selamat Datang Pelajar
-        function renderWelcomeScreen(user) {
+        function renderTopCommitteeEvaluationScreen() {
+            const { topCommitteeMembers } = evaluationState;
+            let tableRows = topCommitteeMembers.map(member => `
+                <tr>
+                    <td>
+                        <strong>${member.namaPelajar}</strong><br>
+                        <small>${member.AJK}</small>
+                    </td>
+                    <td>
+                        <div class="rating-group" data-member-id="${member.noKP}">
+                            ${[1,2,3,4,5].map(n => `<button class="btn btn-secondary">${n}</button>`).join('')}
+                        </div>
+                    </td>
+                </tr>
+            `).join('');
+
             appContainer.innerHTML = `
-                <h2>Selamat Datang,</h2>
-                <h1>${user.namaPelajar}</h1>
-                <p style="text-align: center;">Anda dari AJK: <strong>${user.AJK || 'Tidak Ditetapkan'}</strong></p>
-                <p style="text-align: center;">Sistem akan membawa anda ke halaman penilaian sebentar lagi.</p>
-                <button id="logoutBtn" class="btn btn-secondary">Log Keluar</button>
+                <h2>Langkah 1: Penilaian Jawatankuasa Tertinggi</h2>
+                <h3>Sila nilai prestasi pengurusan mereka secara keseluruhan.</h3>
+                <table class="evaluation-table">${tableRows}</table>
+                <button id="nextStepBtn" class="btn">Seterusnya</button>
+                <p id="message" class="message error"></p>
             `;
-             document.getElementById('logoutBtn').addEventListener('click', renderRoleSelectionScreen);
+             document.getElementById('nextStepBtn').addEventListener('click', handleTopCommitteeSubmit);
         }
 
+        function renderOwnCommitteeEvaluationScreen() {
+            // Logik untuk paparan Langkah 2 (akan dibina)
+            appContainer.innerHTML = `
+                <h2>Langkah 2: Penilaian Rakan AJK</h2>
+                <h3>Ini adalah bahagian penilaian rakan AJK sendiri (dalam pembinaan).</h3>
+                <button id="finishBtn" class="btn">Selesai</button>
+            `;
+             document.getElementById('finishBtn').addEventListener('click', renderCompletionScreen);
+        }
+
+        function renderCompletionScreen() {
+             appContainer.innerHTML = `
+                <h2>Terima Kasih!</h2>
+                <h3>Penilaian anda telah berjaya direkodkan.</h3>
+                <button id="logoutBtn" class="btn">Log Keluar</button>
+            `;
+            document.getElementById('logoutBtn').addEventListener('click', () => {
+                sessionStorage.clear();
+                renderRoleSelectionScreen();
+            });
+        }
+        
         // =================================================================================
         // FUNGSI-FUNGSI PENGENDALI (HANDLER)
         // =================================================================================
-
-        // Kendalikan Log Masuk Pelajar
         async function handleStudentLogin() {
             const noKPInput = document.getElementById('noKP').value.replace(/-/g, '');
             const message = document.getElementById('message');
@@ -231,9 +331,8 @@
 
                 if (docSnap.exists()) {
                     const userFound = docSnap.data();
-                    console.log("Pengguna ditemui:", userFound);
                     sessionStorage.setItem('loggedInUser', JSON.stringify(userFound));
-                    renderWelcomeScreen(userFound); 
+                    await startEvaluationFlow(userFound);
                 } else {
                     message.textContent = "No. Kad Pengenalan tidak wujud dalam rekod.";
                     message.style.display = 'block';
@@ -245,11 +344,10 @@
             }
         }
         
-        // Kendalikan Log Masuk Admin
         function handleAdminLogin() {
             const pass = document.getElementById('adminPass').value;
             const message = document.getElementById('message');
-            const ADMIN_PASSWORD = "admin123"; // Kata laluan admin - boleh ditukar
+            const ADMIN_PASSWORD = "admin123";
 
             if (pass === ADMIN_PASSWORD) {
                 renderAdminDashboard();
@@ -259,7 +357,6 @@
             }
         }
         
-        // Kendalikan Muat Naik Data
         async function handleUploadData() {
             const fileInput = document.getElementById('excelFile');
             const message = document.getElementById('message');
@@ -271,10 +368,8 @@
                 message.style.display = 'block';
                 return;
             }
-
             const file = fileInput.files[0];
             const reader = new FileReader();
-
             reader.onload = async function(event) {
                 uploadBtn.disabled = true;
                 message.textContent = "Memproses dan memuat naik data... Sila tunggu...";
@@ -288,61 +383,75 @@
                     const worksheet = workbook.Sheets[firstSheetName];
                     const jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
                     
-                    if (jsonData.length === 0) {
-                        throw new Error("Fail Excel kosong atau format tidak betul.");
-                    }
+                    if (jsonData.length === 0) throw new Error("Fail Excel kosong.");
 
                     const collectionRef = collection(db, "pelajar");
                     let count = 0;
-
                     for (const student of jsonData) {
-                        // Pastikan No. KP wujud dan bersihkannya
                         const noKP = String(student["No. KP"] || '').replace(/[^0-9]/g, '');
-                        if (!noKP) continue; // Langkau baris jika tiada No. KP
-
+                        if (!noKP) continue;
                         const studentDoc = {
-                            namaPelajar: student["Nama Pelajar"] || "",
-                            noKP: noKP,
+                            namaPelajar: student["Nama Pelajar"] || "", noKP,
                             aGiliran: String(student["A. Giliran"] || ''),
-                            kelas: student["Kelas"] || "",
-                            kumpulan: student["Kumpulan"] || "",
+                            kelas: student["Kelas"] || "", kumpulan: student["Kumpulan"] || "",
                             AJK: student["AJK"] || ""
                         };
-                        
-                        const docRef = doc(collectionRef, noKP);
-                        await setDoc(docRef, studentDoc);
+                        await setDoc(doc(collectionRef, noKP), studentDoc);
                         count++;
                     }
-                    
                     message.textContent = `Selesai! ${count} rekod pelajar berjaya dimuat naik.`;
                     message.className = 'message success';
-                    console.log(`Selesai! ${count} rekod pelajar telah berjaya dimuat naik.`);
-
                 } catch (error) {
                     console.error("Ralat memuat naik:", error);
-                    message.textContent = `Gagal memuat naik data. Semak format fail atau konsol untuk ralat.`;
+                    message.textContent = `Gagal memuat naik data. Semak format fail.`;
                     message.className = 'message error';
                 } finally {
                     uploadBtn.disabled = false;
                 }
             };
-
-            reader.onerror = function() {
-                message.textContent = "Gagal membaca fail.";
-                message.className = 'message error';
-                message.style.display = 'block';
-            };
-
             reader.readAsArrayBuffer(file);
+        }
+        
+        async function startEvaluationFlow(currentUser) {
+            appContainer.innerHTML = `<h2>Memuatkan data penilaian...</h2>`;
+            const allStudents = await fetchAllStudents();
+            if(!allStudents) {
+                appContainer.innerHTML = `<h2>Gagal memuatkan data. Sila cuba lagi.</h2>`;
+                return;
+            }
+
+            const topCommitteeRoles = ["PENGERUSI", "NAIB PENGERUSI", "SETIAUSAHA", "BENDAHARI"];
+            evaluationState.currentUser = currentUser;
+            evaluationState.allStudents = allStudents;
+            evaluationState.topCommitteeMembers = allStudents.filter(s => topCommitteeRoles.includes(s.AJK));
+            evaluationState.userCommitteeMembers = allStudents.filter(s => s.AJK === currentUser.AJK && s.noKP !== currentUser.noKP);
+            evaluationState.currentQuestionIndex = 0;
+            evaluationState.answers = { topCommittee: {}, ownCommittee: {} };
+
+            renderTopCommitteeEvaluationScreen();
+        }
+        
+        function handleTopCommitteeSubmit() {
+            // Logik untuk menyimpan data Langkah 1 dan beralih ke Langkah 2
+            console.log("Menyimpan data JKT & teruskan ke Langkah 2");
+            renderOwnCommitteeEvaluationScreen();
+        }
+        
+        async function fetchAllStudents() {
+            try {
+                const querySnapshot = await getDocs(collection(db, "pelajar"));
+                return querySnapshot.docs.map(doc => doc.data());
+            } catch (error) {
+                console.error("Ralat mendapatkan semua pelajar: ", error);
+                return null;
+            }
         }
 
         // =================================================================================
         // MULAKAN APLIKASI
         // =================================================================================
         renderRoleSelectionScreen();
-
     </script>
 </body>
 </html>
-
 
