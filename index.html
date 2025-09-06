@@ -162,7 +162,7 @@
     <!-- 3. SKRIP FIREBASE DAN LOGIK APLIKASI -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js";
-        import { getFirestore, collection, getDocs, doc, setDoc } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
+        import { getFirestore, collection, getDoc, doc, setDoc, getDocs } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
         import { getAnalytics } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-analytics.js";
 
         // Konfigurasi Firebase Anda (TELAH DIKEMASKINI)
@@ -316,7 +316,8 @@
         // FUNGSI-FUNGSI PENGENDALI (HANDLER)
         // =================================================================================
         async function handleStudentLogin() {
-            const noKPInput = document.getElementById('noKP').value.replace(/-/g, '');
+            // [DIKEMASKINI] Menambah .trim() untuk membuang ruang kosong
+            const noKPInput = document.getElementById('noKP').value.replace(/-/g, '').trim();
             const message = document.getElementById('message');
             
             if (!noKPInput) {
@@ -324,16 +325,21 @@
                 message.style.display = 'block';
                 return;
             }
+            
+            // [DIKEMASKINI] Menambah log untuk tujuan diagnostik
+            console.log(`Mencuba log masuk dengan No. KP: [${noKPInput}]`);
 
             try {
                 const docRef = doc(db, "pelajar", noKPInput);
                 const docSnap = await getDoc(docRef);
 
                 if (docSnap.exists()) {
+                    console.log("Pelajar ditemui:", docSnap.data());
                     const userFound = docSnap.data();
                     sessionStorage.setItem('loggedInUser', JSON.stringify(userFound));
                     await startEvaluationFlow(userFound);
                 } else {
+                    console.error(`Pelajar dengan No. KP [${noKPInput}] tidak ditemui dalam Firestore.`);
                     message.textContent = "No. Kad Pengenalan tidak wujud dalam rekod.";
                     message.style.display = 'block';
                 }
@@ -387,18 +393,31 @@
 
                     const collectionRef = collection(db, "pelajar");
                     let count = 0;
+                    console.log("--- Memulakan Proses Muat Naik ---");
                     for (const student of jsonData) {
-                        const noKP = String(student["No. KP"] || '').replace(/[^0-9]/g, '');
-                        if (!noKP) continue;
+                        // [DIKEMASKINI] Menambah .trim() untuk membersihkan data dari Excel
+                        const noKP = String(student["No. KP"] || '').replace(/[^0-9]/g, '').trim();
+                        
+                        if (!noKP) {
+                            console.warn("Baris dilangkau kerana No. KP kosong:", student);
+                            continue;
+                        }
+                        
+                        // [DIKEMASKINI] Menambah log untuk setiap pelajar yang dimuat naik
+                        console.log(`Memuat naik data untuk No. KP (ID Dokumen): [${noKP}]`);
+
                         const studentDoc = {
-                            namaPelajar: student["Nama Pelajar"] || "", noKP,
-                            aGiliran: String(student["A. Giliran"] || ''),
-                            kelas: student["Kelas"] || "", kumpulan: student["Kumpulan"] || "",
-                            AJK: student["AJK"] || ""
+                            namaPelajar: String(student["Nama Pelajar"] || "").trim(),
+                            noKP,
+                            aGiliran: String(student["A. Giliran"] || '').trim(),
+                            kelas: String(student["Kelas"] || "").trim(),
+                            kumpulan: String(student["Kumpulan"] || "").trim(),
+                            AJK: String(student["AJK"] || "").trim()
                         };
                         await setDoc(doc(collectionRef, noKP), studentDoc);
                         count++;
                     }
+                    console.log("--- Proses Muat Naik Selesai ---");
                     message.textContent = `Selesai! ${count} rekod pelajar berjaya dimuat naik.`;
                     message.className = 'message success';
                 } catch (error) {
@@ -406,7 +425,7 @@
                     if (error.code === 'permission-denied') {
                         message.textContent = 'Gagal: Akses ke pangkalan data disekat. Sila semak "Rules" di Firebase anda.';
                     } else {
-                        message.textContent = `Galat semasa memuat naik. Sila semak format fail atau konsol untuk butiran.`;
+                        message.textContent = `Gagal memuat naik. Sila semak format fail atau konsol untuk butiran.`;
                     }
                     message.className = 'message error';
                 } finally {
@@ -458,5 +477,4 @@
     </script>
 </body>
 </html>
-
 
