@@ -433,7 +433,7 @@
 
                 const { topCommitteeResults, peerResults } = processEvaluationData(evaluations, students);
                 
-                const uniqueCommittees = [...new Set(students.filter(s => s.AJK && !topCommitteeRoles.includes(s.AJK)).map(s => s.AJK))];
+                const uniqueCommittees = [...new Set(students.filter(s => s.AJK && !topCommitteeRoles.includes(s.AJK)).map(s => s.AJK))].sort();
                 let filterOptions = uniqueCommittees.map(ajk => `<option value="${ajk}">${ajk}</option>`).join('');
 
                 let topCommitteeHtml = Object.values(topCommitteeResults).map(res => `
@@ -528,7 +528,6 @@
                     console.log("Pengguna ini telah melengkapkan penilaian. Terus ke skrin selesai.");
                     renderCompletionScreen();
                 } else {
-                    // Jika belum menilai, teruskan ke aliran biasa
                     console.log("Memulakan aliran penilaian.");
                     await startEvaluationFlow(userFound);
                 }
@@ -623,8 +622,22 @@
             evaluationState.currentUser = currentUser;
             evaluationState.allStudents = allStudents;
             
-            evaluationState.topCommitteeMembers = allStudents.filter(s => topCommitteeRoles.includes(s.AJK) && s.noKP !== currentUser.noKP);
-            evaluationState.userCommitteeMembers = allStudents.filter(s => s.AJK === currentUser.AJK && s.noKP !== currentUser.noKP);
+            // [LOGIK PENAPISAN DIPERBAIKI DAN DIBUAT LEBIH ROBUST]
+            const currentUserAJK = (currentUser.AJK || "").trim().toUpperCase();
+            
+            evaluationState.topCommitteeMembers = allStudents.filter(s => {
+                const studentAJK = (s.AJK || "").trim().toUpperCase();
+                return topCommitteeRoles.includes(studentAJK) && s.noKP !== currentUser.noKP;
+            });
+
+            evaluationState.userCommitteeMembers = allStudents.filter(s => {
+                const studentAJK = (s.AJK || "").trim().toUpperCase();
+                return studentAJK === currentUserAJK && s.noKP !== currentUser.noKP;
+            });
+            
+            console.log(`AJK Pengguna: ${currentUserAJK}`);
+            console.log(`Ahli AJK untuk dinilai (${evaluationState.userCommitteeMembers.length}):`, evaluationState.userCommitteeMembers.map(m => m.namaPelajar));
+
 
             evaluationState.currentQuestionIndex = 0;
             evaluationState.answers = { topCommittee: {}, ownCommittee: {} };
