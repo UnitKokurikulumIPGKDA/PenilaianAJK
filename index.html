@@ -229,11 +229,7 @@
         // =================================================================================
         // SENARAI AJK DAN SOALAN
         // =================================================================================
-        const committeeList = [
-            "AJK PROGRAM", "AJK PROTOKOL", "AJK AKTIVITI", "AJK TEKNIKAL & SIARAYA",
-            "AJK TUGAS-TUGAS KHAS", "AJK KESELAMATAN & KEBAJIKAN", "AJK PENGANGKUTAN",
-            "AJK HADIAH & CENDERAHATI", "AJK JAMUAN", "AJK DOKUMENTASI & PUBLISITI"
-        ];
+        const topCommitteeRoles = ["PENGERUSI", "NAIB PENGERUSI", "SETIAUSAHA", "BENDAHARI"];
 
         const evaluationQuestions = [
             "Sejauh manakah ahli ini terlibat secara aktif dalam sesi perbincangan dan menyumbang kepada perancangan tugas AJK?",
@@ -295,7 +291,7 @@
             appContainer.innerHTML = `
                 <h2>Papan Pemuka Admin</h2>
                 <div class="form-group">
-                    <label for="excelFile">Fail Data Pelajar (Peranan JKT akan dikesan secara automatik)</label>
+                    <label for="excelFile">Fail Data Pelajar (Lengkap dengan AJK)</label>
                     <input type="file" id="excelFile" accept=".xlsx, .xls, .csv" style="border: none;">
                 </div>
                 <button id="uploadBtn" class="btn">Muat Naik Data Pelajar</button>
@@ -307,24 +303,6 @@
             document.getElementById('uploadBtn').addEventListener('click', handleUploadData);
             document.getElementById('viewResultsBtn').addEventListener('click', renderResultsScreen);
             document.getElementById('logoutBtn').addEventListener('click', renderRoleSelectionScreen);
-        }
-
-        function renderCommitteeSelectionScreen(currentUser) {
-            const options = committeeList.map(ajk => `<option value="${ajk}">${ajk}</option>`).join('');
-            appContainer.innerHTML = `
-                <h2>Selamat Datang, ${currentUser.namaPelajar}!</h2>
-                <h3>Sila pilih jawatankuasa (AJK) anda untuk meneruskan.</h3>
-                <div class="form-group">
-                    <label for="committeeSelect">Pilih AJK</label>
-                    <select id="committeeSelect">
-                        <option value="" disabled selected>-- Sila Pilih --</option>
-                        ${options}
-                    </select>
-                </div>
-                <button id="saveCommitteeBtn" class="btn">Simpan & Teruskan</button>
-                <p id="message" class="message error"></p>
-            `;
-            document.getElementById('saveCommitteeBtn').addEventListener('click', handleCommitteeSelection);
         }
 
         function renderTopCommitteeEvaluationScreen() {
@@ -366,13 +344,12 @@
         }
 
         function renderPeerQuestionScreen() {
-            const { userCommitteeMembers, currentQuestionIndex } = evaluationState;
+            const { userCommitteeMembers, currentQuestionIndex, currentUser } = evaluationState;
             const question = evaluationQuestions[currentQuestionIndex];
-
-            // Ini adalah pembetulan untuk kes di mana pengguna tiada rakan AJK
+            
             if (userCommitteeMembers.length === 0) {
                 console.log("Tiada rakan AJK untuk dinilai. Melengkapkan penilaian...");
-                handleFinalSubmit(); // Terus ke proses akhir
+                handleFinalSubmit(); 
                 return;
             }
 
@@ -398,7 +375,7 @@
             const isLastQuestion = currentQuestionIndex === evaluationQuestions.length - 1;
 
             appContainer.innerHTML = `
-                <h2>Langkah 2: Penilaian Rakan AJK</h2>
+                <h2>Langkah 2: Penilaian Rakan AJK (${currentUser.AJK})</h2>
                 <h3>Soalan ${currentQuestionIndex + 1} daripada ${evaluationQuestions.length}</h3>
                 
                 <div class="criteria-box">
@@ -456,7 +433,6 @@
 
                 const { topCommitteeResults, peerResults } = processEvaluationData(evaluations, students);
                 
-                const topCommitteeRoles = ["PENGERUSI", "NAIB PENGERUSI", "SETIAUSAHA", "BENDAHARI"];
                 const uniqueCommittees = [...new Set(students.filter(s => s.AJK && !topCommitteeRoles.includes(s.AJK)).map(s => s.AJK))];
                 let filterOptions = uniqueCommittees.map(ajk => `<option value="${ajk}">${ajk}</option>`).join('');
 
@@ -532,7 +508,6 @@
             }
             
             try {
-                // Langkah 1: Semak jika pelajar wujud
                 const studentDocRef = doc(db, "pelajar", noKPInput);
                 const studentDocSnap = await getDoc(studentDocRef);
 
@@ -545,16 +520,6 @@
                 const userFound = studentDocSnap.data();
                 sessionStorage.setItem('loggedInUser', JSON.stringify(userFound));
 
-                // --- INI ADALAH LOGIK YANG TELAH DIBAIKI ---
-
-                // Langkah 2: SEMAK JIKA AJK KOSONG DAHULU
-                if (!userFound.AJK || userFound.AJK.trim() === "") {
-                    console.log("AJK belum dipilih. Memaparkan skrin pemilihan.");
-                    renderCommitteeSelectionScreen(userFound);
-                    return; // Hentikan fungsi di sini dan tunggu input pengguna
-                }
-
-                // Langkah 3: JIKA AJK SUDAH ADA, BARU SEMAK STATUS PENILAIAN
                 const evaluationDocRef = doc(db, "penilaian", noKPInput);
                 const evaluationDocSnap = await getDoc(evaluationDocRef);
 
@@ -566,5 +531,352 @@
                     await startEvaluationFlow(userFound);
                 }
 
-            } catch (error)
+            } catch (error) {
+                console.error("Ralat semasa log masuk: ", error);
+                message.textContent = "Gagal berhubung dengan pangkalan data.";
+                message.style.display = 'block';
+            }
+        }
+        
+        function handleAdminLogin() {
+            const pass = document.getElementById('adminPass').value;
+            const message = document.getElementById('message');
+            const ADMIN_PASSWORD = "admin123";
+
+            if (pass === ADMIN_PASSWORD) {
+                renderAdminDashboard();
+            } else {
+                message.textContent = "Kata laluan salah.";
+                message.style.display = 'block';
+            }
+        }
+        
+        async function handleUploadData() {
+            const fileInput = document.getElementById('excelFile');
+            const message = document.getElementById('message');
+            const uploadBtn = document.getElementById('uploadBtn');
+
+            if (fileInput.files.length === 0) {
+                message.textContent = "Sila pilih fail Excel terlebih dahulu.";
+                message.className = 'message error';
+                message.style.display = 'block';
+                return;
+            }
+            const file = fileInput.files[0];
+            const reader = new FileReader();
+            reader.onload = async function(event) {
+                uploadBtn.disabled = true;
+                message.textContent = "Memproses dan memuat naik data... Sila tunggu...";
+                message.className = 'message';
+                message.style.display = 'block';
+
+                try {
+                    const data = new Uint8Array(event.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    const firstSheetName = workbook.SheetNames[0];
+                    const worksheet = workbook.Sheets[firstSheetName];
+                    const jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
+                    
+                    if (jsonData.length === 0) throw new Error("Fail Excel kosong.");
+
+                    const collectionRef = collection(db, "pelajar");
+                    let count = 0;
+                    for (const student of jsonData) {
+                        const noKP = String(student["No. KP"] || '').replace(/[^0-9]/g, '').trim();
+                        if (!noKP) continue;
+                        
+                        const studentDoc = {
+                            namaPelajar: String(student["Nama Pelajar"] || "").trim(),
+                            noKP,
+                            aGiliran: String(student["A. Giliran"] || '').trim(),
+                            kelas: String(student["Kelas"] || "").trim(),
+                            kumpulan: String(student["Kumpulan"] || "").trim(),
+                            AJK: String(student["AJK"] || "").trim().toUpperCase()
+                        };
+                        await setDoc(doc(collectionRef, noKP), studentDoc);
+                        count++;
+                    }
+                    message.textContent = `Selesai! ${count} rekod pelajar berjaya dimuat naik.`;
+                    message.className = 'message success';
+                } catch (error) {
+                    console.error("Ralat memuat naik:", error);
+                    message.textContent = `Gagal memuat naik. Sila semak konsol untuk butiran.`;
+                    message.className = 'message error';
+                } finally {
+                    uploadBtn.disabled = false;
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        }
+        
+        async function startEvaluationFlow(currentUser) {
+            appContainer.innerHTML = `<h2>Memuatkan data penilaian...</h2>`;
+            const allStudents = await fetchAllStudents();
+            if(!allStudents) {
+                appContainer.innerHTML = `<h2>Gagal memuatkan data. Sila cuba lagi.</h2>`;
+                return;
+            }
+
+            evaluationState.currentUser = currentUser;
+            evaluationState.allStudents = allStudents;
+            
+            // Pengguna tidak akan menilai diri mereka sendiri
+            evaluationState.topCommitteeMembers = allStudents.filter(s => topCommitteeRoles.includes(s.AJK) && s.noKP !== currentUser.noKP);
+            evaluationState.userCommitteeMembers = allStudents.filter(s => s.AJK === currentUser.AJK && s.noKP !== currentUser.noKP);
+
+            evaluationState.currentQuestionIndex = 0;
+            evaluationState.answers = { topCommittee: {}, ownCommittee: {} };
+
+            renderTopCommitteeEvaluationScreen();
+        }
+
+        function handleRatingClick(event) {
+            if (!event.target.matches('.rating-group .btn')) return;
+
+            const clickedButton = event.target;
+            const ratingGroup = clickedButton.parentElement;
+            const memberId = ratingGroup.dataset.memberId;
+            const score = parseInt(clickedButton.textContent, 10);
+
+            ratingGroup.querySelectorAll('.btn').forEach(btn => btn.classList.remove('selected'));
+            clickedButton.classList.add('selected');
+
+            evaluationState.answers.topCommittee[memberId] = score;
+        }
+        
+        async function handleTopCommitteeSubmit() {
+            const { topCommitteeMembers, answers, currentUser } = evaluationState;
+            const message = document.getElementById('message');
+
+            if (Object.keys(answers.topCommittee).length < topCommitteeMembers.length) {
+                message.textContent = "Sila berikan penilaian kepada semua ahli Jawatankuasa Tertinggi.";
+                message.style.display = 'block';
+                return;
+            }
+            
+            message.style.display = 'none';
+
+            try {
+                const docRef = doc(db, "penilaian", currentUser.noKP);
+                await setDoc(docRef, { 
+                    penilai: { noKP: currentUser.noKP, nama: currentUser.namaPelajar },
+                    penilaianJKT: answers.topCommittee 
+                }, { merge: true });
+                renderPeerQuestionScreen();
+            } catch (error) {
+                message.textContent = "Gagal menyimpan data penilaian. Sila cuba lagi.";
+                message.style.display = 'block';
+            }
+        }
+
+        function handlePeerRatingClick(event) {
+            if (!event.target.matches('.rating-group .btn')) return;
+
+            const clickedButton = event.target;
+            const ratingGroup = clickedButton.parentElement;
+            const memberId = ratingGroup.dataset.memberId;
+            const score = parseInt(clickedButton.textContent, 10);
+            const questionIndex = evaluationState.currentQuestionIndex;
+
+            ratingGroup.querySelectorAll('.btn').forEach(btn => btn.classList.remove('selected'));
+            clickedButton.classList.add('selected');
+
+            if (!evaluationState.answers.ownCommittee[questionIndex]) {
+                evaluationState.answers.ownCommittee[questionIndex] = {};
+            }
+            evaluationState.answers.ownCommittee[questionIndex][memberId] = score;
+        }
+
+        function handleNextQuestion() {
+            const { currentQuestionIndex, userCommitteeMembers, answers } = evaluationState;
+            const message = document.getElementById('message');
+
+            const currentAnswers = answers.ownCommittee[currentQuestionIndex] || {};
+            if (Object.keys(currentAnswers).length < userCommitteeMembers.length) {
+                message.textContent = 'Sila berikan penilaian kepada semua ahli untuk soalan ini.';
+                message.style.display = 'block';
+                return;
+            }
+            message.style.display = 'none';
+
+            if (currentQuestionIndex === evaluationQuestions.length - 1) {
+                handleFinalSubmit();
+            } else {
+                evaluationState.currentQuestionIndex++;
+                renderPeerQuestionScreen();
+            }
+        }
+
+        function handlePrevQuestion() {
+            if (evaluationState.currentQuestionIndex > 0) {
+                evaluationState.currentQuestionIndex--;
+                renderPeerQuestionScreen();
+            }
+        }
+
+        async function handleFinalSubmit() {
+            appContainer.innerHTML = `<h2>Menyimpan semua data penilaian...</h2>`;
+            const { answers, currentUser } = evaluationState;
+
+            try {
+                const docRef = doc(db, "penilaian", currentUser.noKP);
+                await setDoc(docRef, { 
+                    penilaianAJK: answers.ownCommittee 
+                }, { merge: true });
+                renderCompletionScreen();
+            } catch (error) {
+                appContainer.innerHTML = `
+                    <h2>Gagal menyimpan data.</h2>
+                    <p>Sila cuba lagi atau hubungi admin.</p>
+                    <button id="retryBtn" class="btn">Cuba Semula</button>
+                `;
+                document.getElementById('retryBtn').addEventListener('click', handleFinalSubmit);
+            }
+        }
+        
+        async function fetchAllStudents() {
+            try {
+                const querySnapshot = await getDocs(collection(db, "pelajar"));
+                return querySnapshot.docs.map(doc => doc.data());
+            } catch (error) {
+                return null;
+            }
+        }
+
+        function handleAjkFilterChange(event, allPeerResults) {
+            const selectedAjk = event.target.value;
+            const tableBody = document.querySelector('#peerResultsTable tbody');
+
+            let filteredResults;
+            if (selectedAjk === 'semua') {
+                filteredResults = Object.values(allPeerResults);
+            } else {
+                filteredResults = Object.values(allPeerResults).filter(res => res.ajk === selectedAjk);
+            }
+
+            const newTableBodyHtml = filteredResults.map(res => `
+                <tr>
+                    <td><strong>${res.nama}</strong><br><small>${res.ajk}</small></td>
+                    <td>${res.totalVotes}</td>
+                    <td>${res.average.toFixed(2)}</td>
+                </tr>
+            `).join('');
+
+            tableBody.innerHTML = newTableBodyHtml;
+        }
+
+
+        function processEvaluationData(evaluations, students) {
+            const results = {};
+            students.forEach(s => {
+                results[s.noKP] = { 
+                    nama: s.namaPelajar, 
+                    ajk: s.AJK,
+                    jktScores: [],
+                    peerScores: {} 
+                };
+            });
+
+            evaluations.forEach(ev => {
+                if (ev.penilaianJKT) {
+                    for (const [memberId, score] of Object.entries(ev.penilaianJKT)) {
+                        if (results[memberId]) results[memberId].jktScores.push(score);
+                    }
+                }
+                if (ev.penilaianAJK) {
+                    for (const [qIndex, answers] of Object.entries(ev.penilaianAJK)) {
+                        for (const [memberId, score] of Object.entries(answers)) {
+                            if (results[memberId]) {
+                                if (!results[memberId].peerScores[qIndex]) results[memberId].peerScores[qIndex] = [];
+                                results[memberId].peerScores[qIndex].push(score);
+                            }
+                        }
+                    }
+                }
+            });
+
+            const topCommitteeResults = {};
+            const peerResults = {};
+
+            for (const [studentId, data] of Object.entries(results)) {
+                if (topCommitteeRoles.includes(data.ajk)) {
+                    const totalScore = data.jktScores.reduce((a, b) => a + b, 0);
+                    topCommitteeResults[studentId] = {
+                        nama: data.nama, ajk: data.ajk,
+                        totalVotes: data.jktScores.length,
+                        average: data.jktScores.length ? totalScore / data.jktScores.length : 0
+                    };
+                } else {
+                    let totalPeerScore = 0, totalPeerVotes = 0;
+                    Object.values(data.peerScores).forEach(scores => {
+                        totalPeerScore += scores.reduce((a, b) => a + b, 0);
+                        totalPeerVotes += scores.length;
+                    });
+                    peerResults[studentId] = {
+                        nama: data.nama, ajk: data.ajk,
+                        totalVotes: totalPeerVotes,
+                        average: totalPeerVotes ? totalPeerScore / totalPeerVotes : 0
+                    };
+                }
+            }
+            return { topCommitteeResults, peerResults };
+        }
+
+        function downloadResultsAsXlsx(evaluations, students) {
+            const { topCommitteeResults, peerResults } = processEvaluationData(evaluations, students);
+            const studentMap = new Map(students.map(s => [s.noKP, s.namaPelajar]));
+
+            const summaryJKT = Object.values(topCommitteeResults).map(res => ({
+                "Nama": res.nama, "Jawatan": res.ajk, "Jumlah Undi": res.totalVotes, "Purata Skor": res.average.toFixed(2)
+            }));
+            
+            const summaryAJK = Object.values(peerResults).map(res => ({
+                "Nama": res.nama, "AJK": res.ajk, "Jumlah Undian Diterima": res.totalVotes, "Purata Skor Keseluruhan": res.average.toFixed(2)
+            }));
+
+            let rawData = [];
+            evaluations.forEach(ev => {
+                const evaluatorKP = ev.penilai.noKP;
+                const evaluatorName = ev.penilai.nama;
+                if (ev.penilaianJKT) {
+                    for (const [memberId, score] of Object.entries(ev.penilaianJKT)) {
+                        rawData.push({
+                            "Penilai_KP": evaluatorKP, "Penilai_Nama": evaluatorName,
+                            "Dinilai_KP": memberId, "Dinilai_Nama": studentMap.get(memberId) || 'N/A',
+                            "Jenis_Penilaian": "JKT", "Soalan_No": "N/A", "Skor": score
+                        });
+                    }
+                }
+                if (ev.penilaianAJK) {
+                    for (const [qIndex, answers] of Object.entries(ev.penilaianAJK)) {
+                        for (const [memberId, score] of Object.entries(answers)) {
+                           rawData.push({
+                                "Penilai_KP": evaluatorKP, "Penilai_Nama": evaluatorName,
+                                "Dinilai_KP": memberId, "Dinilai_Nama": studentMap.get(memberId) || 'N/A',
+                                "Jenis_Penilaian": "AJK", "Soalan_No": parseInt(qIndex) + 1, "Skor": score
+                            });
+                        }
+                    }
+                }
+            });
+
+            const ws_summary_jkt = XLSX.utils.json_to_sheet(summaryJKT);
+            const ws_summary_ajk = XLSX.utils.json_to_sheet(summaryAJK);
+            const ws_raw_data = XLSX.utils.json_to_sheet(rawData);
+
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws_summary_jkt, "Ringkasan JKT");
+            XLSX.utils.book_append_sheet(wb, ws_summary_ajk, "Ringkasan AJK");
+            XLSX.utils.book_append_sheet(wb, ws_raw_data, "Data Mentah Penilaian");
+
+            XLSX.writeFile(wb, "Laporan_Penilaian_Lengkap.xlsx");
+        }
+        
+        // =================================================================================
+        // MULAKAN APLIKASI
+        // =================================================================================
+        renderRoleSelectionScreen();
+    </script>
+</body>
+</html>
 
