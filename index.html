@@ -229,12 +229,6 @@
         // =================================================================================
         // SENARAI AJK DAN SOALAN
         // =================================================================================
-        const committeeList = [
-            "AJK PROGRAM", "AJK PROTOKOL", "AJK AKTIVITI", "AJK TEKNIKAL & SIARAYA",
-            "AJK TUGAS-TUGAS KHAS", "AJK KESELAMATAN & KEBAJIKAN", "AJK PENGANGKUTAN",
-            "AJK HADIAH & CENDERAHATI", "AJK JAMUAN", "AJK DOKUMENTASI & PUBLISITI"
-        ];
-        
         const topCommitteeRoles = ["PENGERUSI", "NAIB PENGERUSI", "SETIAUSAHA", "BENDAHARI"];
 
         const evaluationQuestions = [
@@ -297,7 +291,7 @@
             appContainer.innerHTML = `
                 <h2>Papan Pemuka Admin</h2>
                 <div class="form-group">
-                    <label for="excelFile">Fail Data Pelajar</label>
+                    <label for="excelFile">Fail Data Pelajar (Lengkap dengan AJK)</label>
                     <input type="file" id="excelFile" accept=".xlsx, .xls, .csv" style="border: none;">
                 </div>
                 <button id="uploadBtn" class="btn">Muat Naik Data Pelajar</button>
@@ -309,24 +303,6 @@
             document.getElementById('uploadBtn').addEventListener('click', handleUploadData);
             document.getElementById('viewResultsBtn').addEventListener('click', renderResultsScreen);
             document.getElementById('logoutBtn').addEventListener('click', renderRoleSelectionScreen);
-        }
-
-        function renderCommitteeSelectionScreen(currentUser) {
-            const options = committeeList.map(ajk => `<option value="${ajk}">${ajk}</option>`).join('');
-            appContainer.innerHTML = `
-                <h2>Selamat Datang, ${currentUser.namaPelajar}!</h2>
-                <h3>Sila pilih jawatankuasa (AJK) anda untuk meneruskan.</h3>
-                <div class="form-group">
-                    <label for="committeeSelect">Pilih AJK</label>
-                    <select id="committeeSelect">
-                        <option value="" disabled selected>-- Sila Pilih --</option>
-                        ${options}
-                    </select>
-                </div>
-                <button id="saveCommitteeBtn" class="btn">Simpan & Teruskan</button>
-                <p id="message" class="message error"></p>
-            `;
-            document.getElementById('saveCommitteeBtn').addEventListener('click', handleCommitteeSelection);
         }
 
         function renderTopCommitteeEvaluationScreen() {
@@ -532,7 +508,6 @@
             }
             
             try {
-                // Langkah 1: Semak jika pelajar wujud
                 const studentDocRef = doc(db, "pelajar", noKPInput);
                 const studentDocSnap = await getDoc(studentDocRef);
 
@@ -545,14 +520,7 @@
                 const userFound = studentDocSnap.data();
                 sessionStorage.setItem('loggedInUser', JSON.stringify(userFound));
 
-                // Langkah 2: Semak jika AJK kosong
-                if (!userFound.AJK || userFound.AJK.trim() === "") {
-                    console.log("AJK belum dipilih. Memaparkan skrin pemilihan.");
-                    renderCommitteeSelectionScreen(userFound);
-                    return; 
-                }
-
-                // Langkah 3: Jika AJK sudah ada, semak status penilaian
+                // Semak status penilaian terlebih dahulu
                 const evaluationDocRef = doc(db, "penilaian", noKPInput);
                 const evaluationDocSnap = await getDoc(evaluationDocRef);
 
@@ -560,6 +528,7 @@
                     console.log("Pengguna ini telah melengkapkan penilaian. Terus ke skrin selesai.");
                     renderCompletionScreen();
                 } else {
+                    // Jika belum menilai, teruskan ke aliran biasa
                     console.log("Memulakan aliran penilaian.");
                     await startEvaluationFlow(userFound);
                 }
@@ -618,17 +587,14 @@
                         const noKP = String(student["No. KP"] || '').replace(/[^0-9]/g, '').trim();
                         if (!noKP) continue;
                         
-                        // [LOGIK DIPERBAIKI] Kekalkan JKT, kosongkan yang lain
-                        const studentAJK = String(student["AJK"] || "").trim().toUpperCase();
-                        const finalAJK = topCommitteeRoles.includes(studentAJK) ? studentAJK : "";
-
+                        // [LOGIK DIPERBAIKI] Kekalkan AJK dari Excel
                         const studentDoc = {
                             namaPelajar: String(student["Nama Pelajar"] || "").trim(),
                             noKP,
                             aGiliran: String(student["A. Giliran"] || '').trim(),
                             kelas: String(student["Kelas"] || "").trim(),
                             kumpulan: String(student["Kumpulan"] || "").trim(),
-                            AJK: finalAJK 
+                            AJK: String(student["AJK"] || "").trim().toUpperCase()
                         };
                         await setDoc(doc(collectionRef, noKP), studentDoc);
                         count++;
@@ -644,30 +610,6 @@
                 }
             };
             reader.readAsArrayBuffer(file);
-        }
-        
-        async function handleCommitteeSelection() {
-            const selectedAJK = document.getElementById('committeeSelect').value;
-            const message = document.getElementById('message');
-            if (!selectedAJK) {
-                message.textContent = 'Sila pilih AJK anda.';
-                message.style.display = 'block';
-                return;
-            }
-
-            const currentUser = JSON.parse(sessionStorage.getItem('loggedInUser'));
-            const docRef = doc(db, "pelajar", currentUser.noKP);
-
-            try {
-                await updateDoc(docRef, { AJK: selectedAJK });
-                currentUser.AJK = selectedAJK; // Kemas kini data dalam sesi
-                sessionStorage.setItem('loggedInUser', JSON.stringify(currentUser));
-                await startEvaluationFlow(currentUser);
-            } catch (error) {
-                console.error("Gagal menyimpan AJK:", error);
-                message.textContent = "Gagal menyimpan pilihan AJK anda. Sila cuba lagi.";
-                message.style.display = 'block';
-            }
         }
 
         async function startEvaluationFlow(currentUser) {
@@ -838,12 +780,12 @@
             });
 
             evaluations.forEach(ev => {
-                if (ev.penilaianJKT) {
+                if (ev.penilai && ev.penilaianJKT) {
                     for (const [memberId, score] of Object.entries(ev.penilaianJKT)) {
                         if (results[memberId]) results[memberId].jktScores.push(score);
                     }
                 }
-                if (ev.penilaianAJK) {
+                if (ev.penilai && ev.penilaianAJK) {
                     for (const [qIndex, answers] of Object.entries(ev.penilaianAJK)) {
                         for (const [memberId, score] of Object.entries(answers)) {
                             if (results[memberId]) {
@@ -896,6 +838,7 @@
 
             let rawData = [];
             evaluations.forEach(ev => {
+                if (!ev.penilai) return; // Skip if evaluator info is missing
                 const evaluatorKP = ev.penilai.noKP;
                 const evaluatorName = ev.penilai.nama;
                 if (ev.penilaianJKT) {
