@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Borang Penilaian</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Style tambahan untuk radio button yang dipilih */
+        .rating input:checked + label {
+            background-color: #2563eb; /* bg-blue-600 */
+            color: white;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 font-sans">
+
+    <div id="app-container" class="container mx-auto p-4 md:p-8 max-w-4xl">
+
+        <div id="loading-state" class="text-center p-12 bg-white rounded-lg shadow-md">
+            <p class="text-lg font-semibold text-gray-700">Memuat turun data penilaian...</p>
+        </div>
+
+        <div id="evaluation-view" class="hidden">
+            <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+                <p id="welcome-message" class="text-xl font-bold text-gray-800"></p>
+                <p class="text-sm text-gray-500">Anda sedang menilai rakan-rakan dari AJK <span id="ajk-name" class="font-semibold"></span>.</p>
+            </div>
+            
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <div id="question-header" class="mb-6 pb-4 border-b">
+                    <p id="question-counter" class="text-sm font-semibold text-blue-600"></p>
+                    <h2 id="question-text" class="text-2xl font-bold text-gray-800 mt-1"></h2>
+                </div>
+
+                <div id="peers-list" class="space-y-6">
+                    </div>
+
+                <div id="nav-buttons" class="flex justify-between items-center mt-8 pt-6 border-t">
+                    <button id="prev-btn" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-6 rounded-lg transition">Sebelumnya</button>
+                    <button id="next-btn" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg transition disabled:bg-gray-300 disabled:cursor-not-allowed">Seterusnya</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="thank-you-view" class="hidden text-center p-12 bg-white rounded-lg shadow-md">
+            <h2 class="text-3xl font-bold text-green-600 mb-4">Terima Kasih!</h2>
+            <p class="text-lg text-gray-700">Penilaian anda telah berjaya dihantar.</p>
+        </div>
+    </div>
+
+    <script type="module">
+        // Import fungsi Firebase yang diperlukan
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+        import { getFirestore, collection, query, where, getDocs, writeBatch, doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+        // Konfigurasi Firebase yang sama
+        const firebaseConfig = {
+          apiKey: "AIzaSyBzSeS4BKox-Ai23Byid-KGMC3bkgObuIQ",
+          authDomain: "penilaian-ajk-big-siri-2.firebaseapp.com",
+          projectId: "penilaian-ajk-big-siri-2",
+          storageBucket: "penilaian-ajk-big-siri-2.firebasestorage.app",
+          messagingSenderId: "159297856496",
+          appId: "1:159297856496:web:761083393b21ac66ab7335",
+          measurementId: "G-M502Y54J9N"
+        };
+        
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        // ============================
+        // SENARAI SOALAN PENILAIAN
+        // ============================
+        const questions = [
+            "Sejauh manakah ahli ini terlibat secara aktif dalam sesi perbincangan dan menyumbang kepada perancangan tugas AJK?",
+            "Adakah ahli ini menunjukkan inisiatif dalam mencadangkan idea atau mengambil tanggungjawab tanpa perlu disuruh?",
+            "Sejauh manakah ahli ini berkomunikasi dengan jelas dan berkesan dengan ahli lain semasa fasa perancangan?",
+            "Adakah ahli ini melaksanakan tugas yang diamanahkan dengan cekap dan penuh tanggungjawab semasa aktiviti berlangsung?",
+            "Sejauh manakah keupayaan ahli ini untuk kekal tenang dan membantu menyelesaikan sebarang masalah yang timbul secara tiba-tiba?",
+            "Adakah ahli ini bekerjasama dengan baik, sedia membantu rakan lain, dan mengekalkan komunikasi yang positif walaupun dalam keadaan sibuk atau tertekan?",
+            "Adakah ahli ini menunjukkan sikap yang positif dan menjadi pendorong semangat kepada ahli AJK yang lain?",
+            "Adakah ahli ini turut serta dan komited dalam menyelesaikan tugasan selepas aktiviti (cth: mengemas, membersihkan kawasan, menyusun peralatan)?",
+            "Sejauh manakah ahli ini menyumbang dalam sesi post-mortem ?"
+        ];
+
+        // Rujukan elemen HTML
+        const loadingState = document.getElementById('loading-state');
+        const evaluationView = document.getElementById('evaluation-view');
+        const thankYouView = document.getElementById('thank-you-view');
+        const welcomeMessage = document.getElementById('welcome-message');
+        const ajkName = document.getElementById('ajk-name');
+        const questionCounter = document.getElementById('question-counter');
+        const questionText = document.getElementById('question-text');
+        const peersList = document.getElementById('peers-list');
+        const prevBtn = document.getElementById('prev-btn');
+        const nextBtn = document.getElementById('next-btn');
+        
+        // State management variables
+        let currentUser = null;
+        let peers = [];
+        let currentQuestionIndex = 0;
+        let scores = {}; // Format: { 'peerId_questionIndex': score }
+
+        // ============================
+        // FUNGSI UTAMA
+        // ============================
+
+        // Fungsi ini berjalan sebaik sahaja halaman dimuatkan
+        async function initializePage() {
+            // 1. Semak jika pengguna telah log masuk
+            const storedUser = localStorage.getItem('pelajarInfo');
+            if (!storedUser) {
+                // Jika tiada, hantar balik ke halaman log masuk
+                window.location.href = 'index.html';
+                return;
+            }
+            currentUser = JSON.parse(storedUser);
+
+            // Jika pengguna sudah menilai, paparkan skrin terima kasih
+            if (currentUser.telahMenilai) {
+                loadingState.classList.add('hidden');
+                thankYouView.classList.remove('hidden');
+                return;
+            }
+
+            welcomeMessage.textContent = `Selamat Datang, ${currentUser.nama}!`;
+            ajkName.textContent = currentUser.ajk;
+
+            // 2. Dapatkan senarai rakan se-AJK dari Firestore
+            await fetchPeers();
+
+            // 3. Paparkan soalan pertama
+            renderCurrentQuestion();
+            
+            // 4. Sembunyikan 'loading' dan paparkan borang penilaian
+            loadingState.classList.add('hidden');
+            evaluationView.classList.remove('hidden');
+        }
+
+        // Fungsi untuk mengambil data rakan dari Firestore
+        async function fetchPeers() {
+            const q = query(collection(db, "pelajar"), where("ajk", "==", currentUser.ajk));
+            const querySnapshot = await getDocs(q);
+            
+            querySnapshot.forEach(doc => {
+                // Jangan masukkan diri sendiri dalam senarai untuk dinilai
+                if (doc.id !== currentUser.id) {
+                    peers.push({ id: doc.id, ...doc.data() });
+                }
+            });
+        }
+
+        // Fungsi untuk memaparkan soalan dan senarai rakan
+        function renderCurrentQuestion() {
+            questionCounter.textContent = `SOALAN ${currentQuestionIndex + 1} DARIPADA ${questions.length}`;
+            questionText.textContent = questions[currentQuestionIndex];
+            
+            peersList.innerHTML = ''; // Kosongkan senarai lama
+            
+            peers.forEach(peer => {
+                const peerId = peer.id;
+                const scoreKey = `${peerId}_${currentQuestionIndex}`;
+                const currentScore = scores[scoreKey] || 0;
+
+                const peerElement = document.createElement('div');
+                peerElement.className = 'p-4 border rounded-lg flex flex-col md:flex-row md:items-center md:justify-between';
+                peerElement.innerHTML = `
+                    <p class="font-semibold text-lg text-gray-800 mb-3 md:mb-0">${peer.nama}</p>
+                    <div class="rating flex space-x-1" data-peer-id="${peerId}">
+                        ${[1,2,3,4,5].map(value => `
+                            <input type="radio" id="star${value}_${peerId}" name="rating_${peerId}" value="${value}" class="hidden" ${currentScore === value ? 'checked' : ''}>
+                            <label for="star${value}_${peerId}" class="cursor-pointer rounded-full w-10 h-10 flex items-center justify-center transition border hover:bg-blue-100">${value}</label>
+                        `).join('')}
+                    </div>
+                `;
+                peersList.appendChild(peerElement);
+            });
+            
+            updateNavButtons();
+            checkIfAllPeersRated();
+        }
+
+        // Fungsi untuk mengemas kini butang navigasi
+        function updateNavButtons() {
+            prevBtn.disabled = currentQuestionIndex === 0;
+            
+            if (currentQuestionIndex === questions.length - 1) {
+                nextBtn.textContent = 'Hantar';
+                nextBtn.classList.remove('bg-blue-500', 'hover:bg-blue-700');
+                nextBtn.classList.add('bg-green-500', 'hover:bg-green-700');
+            } else {
+                nextBtn.textContent = 'Seterusnya';
+                nextBtn.classList.remove('bg-green-500', 'hover:bg-green-700');
+                nextBtn.classList.add('bg-blue-500', 'hover:bg-blue-700');
+            }
+        }
+
+        // Fungsi untuk menyemak jika semua rakan telah diberi skor untuk soalan semasa
+        function checkIfAllPeersRated() {
+            const ratedPeers = peers.filter(peer => scores[`${peer.id}_${currentQuestionIndex}`]).length;
+            nextBtn.disabled = ratedPeers < peers.length;
+        }
+
+        // Fungsi untuk menghantar semua skor ke Firestore
+        async function submitScores() {
+            nextBtn.disabled = true;
+            nextBtn.textContent = "Menghantar...";
+
+            try {
+                const batch = writeBatch(db);
+                
+                // Proses semua skor untuk disimpan
+                for (const key in scores) {
+                    const [peerId, qIndex] = key.split('_');
+                    const submissionRef = doc(collection(db, "penilaian")); // Cipta ID dokumen rawak
+                    batch.set(submissionRef, {
+                        penilaiId: currentUser.id,
+                        penilaiNama: currentUser.nama,
+                        dinilaiId: peerId,
+                        dinilaiNama: peers.find(p => p.id === peerId).nama,
+                        ajk: currentUser.ajk,
+                        soalanIndex: parseInt(qIndex),
+                        skor: scores[key],
+                        tarikh: new Date()
+                    });
+                }
+
+                // Tandakan bahawa pengguna ini telah selesai menilai
+                const userDocRef = doc(db, "pelajar", currentUser.id);
+                batch.update(userDocRef, { telahMenilai: true });
+
+                await batch.commit();
+
+                // Kemas kini data pengguna di local storage juga
+                currentUser.telahMenilai = true;
+                localStorage.setItem('pelajarInfo', JSON.stringify(currentUser));
+                
+                // Paparkan skrin terima kasih
+                evaluationView.classList.add('hidden');
+                thankYouView.classList.remove('hidden');
+
+            } catch (error) {
+                console.error("Ralat semasa menghantar:", error);
+                alert("Gagal menghantar penilaian. Sila cuba lagi.");
+                nextBtn.disabled = false;
+                updateNavButtons(); // Reset butang ke keadaan asal
+            }
+        }
+
+        // ============================
+        // EVENT LISTENERS
+        // ============================
+        
+        // Dengar klik pada butang Seterusnya/Hantar
+        nextBtn.addEventListener('click', () => {
+            if (currentQuestionIndex < questions.length - 1) {
+                currentQuestionIndex++;
+                renderCurrentQuestion();
+            } else {
+                // Jika ini soalan terakhir, hantar data
+                if (confirm('Adakah anda pasti untuk menghantar semua penilaian anda?')) {
+                    submitScores();
+                }
+            }
+        });
+
+        // Dengar klik pada butang Sebelumnya
+        prevBtn.addEventListener('click', () => {
+            if (currentQuestionIndex > 0) {
+                currentQuestionIndex--;
+                renderCurrentQuestion();
+            }
+        });
+
+        // Dengar perubahan skor
+        peersList.addEventListener('change', (e) => {
+            if (e.target.type === 'radio') {
+                const peerId = e.target.closest('.rating').dataset.peerId;
+                const score = parseInt(e.target.value);
+                const scoreKey = `${peerId}_${currentQuestionIndex}`;
+                scores[scoreKey] = score;
+                checkIfAllPeersRated();
+            }
+        });
+        
+        // Mulakan segalanya
+        initializePage();
+    </script>
+</body>
+</html>
