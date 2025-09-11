@@ -8,25 +8,30 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 <body class="bg-gray-100 flex items-center justify-center h-screen font-sans">
+
     <div id="login-view" class="w-full max-w-sm p-8 bg-white rounded-lg shadow-md">
         <h2 class="text-2xl font-bold text-center text-gray-800 mb-6">Log Masuk Admin</h2>
         <form id="login-form">
             <div class="mb-4">
-                <label for="email" class="block text-gray-700 text-sm font-bold mb-2">E-mel</label>
-                <input type="email" id="email" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" required>
+                <label for="username" class="block text-gray-700 text-sm font-bold mb-2">Nama Pengguna</label>
+                <input type="text" id="username" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" required>
             </div>
             <div class="mb-6">
                 <label for="password" class="block text-gray-700 text-sm font-bold mb-2">Kata Laluan</label>
                 <input type="password" id="password" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 mb-3 leading-tight focus:outline-none focus:shadow-outline" required>
             </div>
             <div class="flex items-center justify-between">
-                <button type="submit" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline w-full">Log Masuk</button>
+                <button type="submit" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline w-full">
+                    Log Masuk
+                </button>
             </div>
         </form>
     </div>
+
     <div id="dashboard-view" class="w-full max-w-md p-8 bg-white rounded-lg shadow-md hidden">
         <h2 class="text-2xl font-bold text-center text-gray-800 mb-2">Papan Pemuka Admin</h2>
         <p class="text-center text-gray-600 mb-6">Selamat datang, Admin!</p>
+        
         <div class="border-t pt-6">
             <h3 class="text-lg font-semibold text-gray-700 mb-2">Muat Naik Data Pelajar</h3>
             <p class="text-sm text-gray-500 mb-4">Pilih fail Excel (.xlsx) dengan header: `Nama Pelajar`, `No. KP`, `AJK`.</p>
@@ -34,9 +39,12 @@
             <p id="upload-status" class="text-sm mt-4"></p>
         </div>
     </div>
+
+
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
         import { getFirestore, collection, doc, writeBatch } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
         const firebaseConfig = {
           apiKey: "AIzaSyBzSeS4BKox-Ai23Byid-KGMC3bkgObuIQ",
           authDomain: "penilaian-ajk-big-siri-2.firebaseapp.com",
@@ -46,50 +54,75 @@
           appId: "1:159297856496:web:761083393b21ac66ab7335",
           measurementId: "G-M502Y54J9N"
         };
+
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
-        const ADMIN_EMAIL = "admin@siri2.com";
-        const ADMIN_PASSWORD = "password123";
+
+        // =================================================================
+        // !! Maklumat Log Masuk Admin Telah Dikemas Kini !!
+        // =================================================================
+        const ADMIN_USERNAME = "ukobig";
+        const ADMIN_PASSWORD = "adminuko123";
+
+        // Rujukan kepada elemen HTML
         const loginView = document.getElementById('login-view');
         const dashboardView = document.getElementById('dashboard-view');
         const loginForm = document.getElementById('login-form');
         const fileUploader = document.getElementById('file-uploader');
         const uploadStatus = document.getElementById('upload-status');
+        
+        // Logik untuk log masuk admin (Telah Dikemas Kini)
         loginForm.addEventListener('submit', (e) => {
             e.preventDefault();
-            const email = document.getElementById('email').value;
+            
+            // Mengambil nilai dari medan 'username'
+            const username = document.getElementById('username').value;
             const password = document.getElementById('password').value;
-            if (email === ADMIN_EMAIL && password === ADMIN_PASSWORD) {
+
+            // Menyemak 'username' dan bukannya 'email'
+            if (username === ADMIN_USERNAME && password === ADMIN_PASSWORD) {
                 loginView.classList.add('hidden');
                 dashboardView.classList.remove('hidden');
-            } else { alert('E-mel atau kata laluan salah!'); }
+            } else {
+                alert('Nama pengguna atau kata laluan salah!');
+            }
         });
+
+        // Logik untuk memuat naik fail Excel (Tiada perubahan)
         fileUploader.addEventListener('change', async (event) => {
             const file = event.target.files[0];
             if (!file) return;
+
             uploadStatus.textContent = 'Memproses fail...';
             uploadStatus.classList.remove('text-green-600', 'text-red-600');
+            
             try {
                 const data = await file.arrayBuffer();
                 const workbook = XLSX.read(data);
                 const worksheet = workbook.Sheets[workbook.SheetNames[0]];
                 const jsonData = XLSX.utils.sheet_to_json(worksheet);
+
                 const batch = writeBatch(db);
+
                 jsonData.forEach(pelajar => {
                     const noKP = pelajar['No. KP']?.toString().replace(/-/g, '');
+
                     if (noKP) {
                         const pelajarRef = doc(db, "pelajar", noKP);
                         batch.set(pelajarRef, {
                             nama: pelajar['Nama Pelajar'],
                             noKP: noKP,
                             ajk: pelajar['AJK'],
-                            telahMenilai: false
+                            telahMenilai: false 
                         });
                     }
                 });
+
                 await batch.commit();
+
                 uploadStatus.textContent = `Berjaya! ${jsonData.length} data pelajar telah dimuat naik.`;
                 uploadStatus.classList.add('text-green-600');
+            
             } catch (error) {
                 console.error("Ralat semasa memproses fail:", error);
                 uploadStatus.textContent = 'Gagal memuat naik. Sila semak format fail dan konsol.';
