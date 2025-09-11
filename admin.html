@@ -8,7 +8,6 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 <body class="bg-gray-100 flex items-center justify-center h-screen font-sans">
-
     <div id="login-view" class="w-full max-w-sm p-8 bg-white rounded-lg shadow-md">
         <h2 class="text-2xl font-bold text-center text-gray-800 mb-6">Log Masuk Admin</h2>
         <form id="login-form">
@@ -21,17 +20,13 @@
                 <input type="password" id="password" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 mb-3 leading-tight focus:outline-none focus:shadow-outline" required>
             </div>
             <div class="flex items-center justify-between">
-                <button type="submit" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline w-full">
-                    Log Masuk
-                </button>
+                <button type="submit" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline w-full">Log Masuk</button>
             </div>
         </form>
     </div>
-
     <div id="dashboard-view" class="w-full max-w-md p-8 bg-white rounded-lg shadow-md hidden">
         <h2 class="text-2xl font-bold text-center text-gray-800 mb-2">Papan Pemuka Admin</h2>
         <p class="text-center text-gray-600 mb-6">Selamat datang, Admin!</p>
-        
         <div class="border-t pt-6">
             <h3 class="text-lg font-semibold text-gray-700 mb-2">Muat Naik Data Pelajar</h3>
             <p class="text-sm text-gray-500 mb-4">Pilih fail Excel (.xlsx) dengan header: `Nama Pelajar`, `No. KP`, `AJK`.</p>
@@ -39,16 +34,9 @@
             <p id="upload-status" class="text-sm mt-4"></p>
         </div>
     </div>
-
-
     <script type="module">
-        // Import fungsi yang diperlukan dari Firebase SDK
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
         import { getFirestore, collection, doc, writeBatch } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-
-        // =================================================================
-        // KONFIGURASI FIREBASE ANDA
-        // =================================================================
         const firebaseConfig = {
           apiKey: "AIzaSyBzSeS4BKox-Ai23Byid-KGMC3bkgObuIQ",
           authDomain: "penilaian-ajk-big-siri-2.firebaseapp.com",
@@ -58,90 +46,56 @@
           appId: "1:159297856496:web:761083393b21ac66ab7335",
           measurementId: "G-M502Y54J9N"
         };
-
-        // Initialize Firebase
         const app = initializeApp(firebaseConfig);
-        const db = getFirestore(app); // Sambungan ke pangkalan data Firestore
-
-        // =================================================================
-        // !! PENTING: Sila tetapkan e-mel dan kata laluan admin di sini
-        // =================================================================
+        const db = getFirestore(app);
         const ADMIN_EMAIL = "admin@siri2.com";
         const ADMIN_PASSWORD = "password123";
-
-        // Rujukan kepada elemen HTML
         const loginView = document.getElementById('login-view');
         const dashboardView = document.getElementById('dashboard-view');
         const loginForm = document.getElementById('login-form');
         const fileUploader = document.getElementById('file-uploader');
         const uploadStatus = document.getElementById('upload-status');
-        
-        // Logik untuk log masuk admin
         loginForm.addEventListener('submit', (e) => {
-            e.preventDefault(); // Halang borang dari muat semula halaman
-            
+            e.preventDefault();
             const email = document.getElementById('email').value;
             const password = document.getElementById('password').value;
-
             if (email === ADMIN_EMAIL && password === ADMIN_PASSWORD) {
-                // Jika berjaya, sembunyikan log masuk dan paparkan dashboard
                 loginView.classList.add('hidden');
                 dashboardView.classList.remove('hidden');
-            } else {
-                alert('E-mel atau kata laluan salah!');
-            }
+            } else { alert('E-mel atau kata laluan salah!'); }
         });
-
-        // Logik untuk memuat naik dan memproses fail Excel
         fileUploader.addEventListener('change', async (event) => {
             const file = event.target.files[0];
             if (!file) return;
-
             uploadStatus.textContent = 'Memproses fail...';
             uploadStatus.classList.remove('text-green-600', 'text-red-600');
-            
             try {
                 const data = await file.arrayBuffer();
                 const workbook = XLSX.read(data);
                 const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-                // Tukar data dari sheet kepada format JSON
                 const jsonData = XLSX.utils.sheet_to_json(worksheet);
-
-                // Menggunakan "writeBatch" untuk memuat naik semua data sekaligus (lebih cekap)
                 const batch = writeBatch(db);
-
                 jsonData.forEach(pelajar => {
-                    // Pastikan No. KP wujud dan bersihkannya dari sebarang sengkang (-)
                     const noKP = pelajar['No. KP']?.toString().replace(/-/g, '');
-
                     if (noKP) {
-                        // Cipta satu rujukan dokumen baru dalam koleksi 'pelajar'
-                        // ID dokumen adalah No. KP pelajar itu sendiri untuk carian mudah
                         const pelajarRef = doc(db, "pelajar", noKP);
-                        
                         batch.set(pelajarRef, {
                             nama: pelajar['Nama Pelajar'],
                             noKP: noKP,
                             ajk: pelajar['AJK'],
-                            // Kita tambah satu medan untuk status penilaian
-                            telahMenilai: false 
+                            telahMenilai: false
                         });
                     }
                 });
-
-                // Hantar semua data ke Firestore
                 await batch.commit();
-
                 uploadStatus.textContent = `Berjaya! ${jsonData.length} data pelajar telah dimuat naik.`;
                 uploadStatus.classList.add('text-green-600');
-            
             } catch (error) {
                 console.error("Ralat semasa memproses fail:", error);
                 uploadStatus.textContent = 'Gagal memuat naik. Sila semak format fail dan konsol.';
                 uploadStatus.classList.add('text-red-600');
             }
         });
-
     </script>
 </body>
 </html>
