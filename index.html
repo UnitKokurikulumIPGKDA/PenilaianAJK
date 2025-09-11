@@ -7,20 +7,29 @@
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-gray-100 flex items-center justify-center h-screen font-sans">
+
     <div class="w-full max-w-sm p-8 bg-white rounded-lg shadow-md">
+        <div class="flex justify-center mb-6">
+            <img src="https://i.imgur.com/x1b3D2D.png" alt="Logo UKO BIG" class="h-24">
+        </div>
         <h2 class="text-2xl font-bold text-center text-gray-800 mb-2">Sistem Penilaian Rakan Sebaya</h2>
         <p class="text-center text-gray-500 mb-6">Sila log masuk menggunakan No. Kad Pengenalan anda.</p>
+        
         <form id="student-login-form">
             <div class="mb-4">
                 <label for="no-kp" class="block text-gray-700 text-sm font-bold mb-2">No. KP (Contoh: 000913020090)</label>
                 <input type="text" id="no-kp" placeholder="Masukkan No. KP tanpa sengkang (-)" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" required>
             </div>
+            
             <div class="flex items-center justify-between">
-                <button type="submit" id="login-button" class="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline w-full">Log Masuk</button>
+                <button type="submit" id="login-button" class="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline w-full">
+                    Log Masuk
+                </button>
             </div>
         </form>
         <p id="status-message" class="text-sm text-center mt-4"></p>
     </div>
+
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
         import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
@@ -55,17 +64,12 @@
                 const docSnap = await getDoc(studentDocRef);
                 if (docSnap.exists()) {
                     const studentData = docSnap.data();
-                    if (studentData.telahMenilai) {
-                        statusMessage.textContent = `Helo ${studentData.nama}, anda telah pun melengkapkan penilaian.`;
-                        statusMessage.className = "text-sm text-center mt-4 text-blue-600";
-                        loginButton.disabled = true;
-                        loginButton.textContent = "Penilaian Selesai";
-                        return;
-                    }
                     statusMessage.textContent = `Selamat datang, ${studentData.nama}! Anda akan dibawa ke halaman penilaian.`;
                     statusMessage.className = "text-sm text-center mt-4 text-green-600";
                     localStorage.setItem('pelajarInfo', JSON.stringify({ id: docSnap.id, ...studentData }));
-                    setTimeout(() => { window.location.href = 'penilaian.html'; }, 2000);
+                    setTimeout(() => {
+                        window.location.href = 'penilaian.html';
+                    }, 2000);
                 } else {
                     statusMessage.textContent = "No. KP anda tidak ditemui dalam rekod. Sila hubungi admin.";
                     statusMessage.className = "text-sm text-center mt-4 text-red-500";
