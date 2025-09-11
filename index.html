@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistem Penilaian Rakan Sebaya</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 flex items-center justify-center h-screen font-sans">
+    <div class="w-full max-w-sm p-8 bg-white rounded-lg shadow-md">
+        <h2 class="text-2xl font-bold text-center text-gray-800 mb-2">Sistem Penilaian Rakan Sebaya</h2>
+        <p class="text-center text-gray-500 mb-6">Sila log masuk menggunakan No. Kad Pengenalan anda.</p>
+        <form id="student-login-form">
+            <div class="mb-4">
+                <label for="no-kp" class="block text-gray-700 text-sm font-bold mb-2">No. KP (Contoh: 000913020090)</label>
+                <input type="text" id="no-kp" placeholder="Masukkan No. KP tanpa sengkang (-)" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" required>
+            </div>
+            <div class="flex items-center justify-between">
+                <button type="submit" id="login-button" class="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline w-full">Log Masuk</button>
+            </div>
+        </form>
+        <p id="status-message" class="text-sm text-center mt-4"></p>
+    </div>
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+        import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+        const firebaseConfig = {
+          apiKey: "AIzaSyBzSeS4BKox-Ai23Byid-KGMC3bkgObuIQ",
+          authDomain: "penilaian-ajk-big-siri-2.firebaseapp.com",
+          projectId: "penilaian-ajk-big-siri-2",
+          storageBucket: "penilaian-ajk-big-siri-2.firebasestorage.app",
+          messagingSenderId: "159297856496",
+          appId: "1:159297856496:web:761083393b21ac66ab7335",
+          measurementId: "G-M502Y54J9N"
+        };
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const loginForm = document.getElementById('student-login-form');
+        const noKpInput = document.getElementById('no-kp');
+        const loginButton = document.getElementById('login-button');
+        const statusMessage = document.getElementById('status-message');
+        loginForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const noKP = noKpInput.value.replace(/[-\s]/g, '');
+            if (!noKP) {
+                statusMessage.textContent = "Sila masukkan No. KP.";
+                statusMessage.className = "text-sm text-center mt-4 text-red-500";
+                return;
+            }
+            loginButton.disabled = true;
+            loginButton.textContent = "Menyemak...";
+            statusMessage.textContent = "";
+            try {
+                const studentDocRef = doc(db, "pelajar", noKP);
+                const docSnap = await getDoc(studentDocRef);
+                if (docSnap.exists()) {
+                    const studentData = docSnap.data();
+                    if (studentData.telahMenilai) {
+                        statusMessage.textContent = `Helo ${studentData.nama}, anda telah pun melengkapkan penilaian.`;
+                        statusMessage.className = "text-sm text-center mt-4 text-blue-600";
+                        loginButton.disabled = true;
+                        loginButton.textContent = "Penilaian Selesai";
+                        return;
+                    }
+                    statusMessage.textContent = `Selamat datang, ${studentData.nama}! Anda akan dibawa ke halaman penilaian.`;
+                    statusMessage.className = "text-sm text-center mt-4 text-green-600";
+                    localStorage.setItem('pelajarInfo', JSON.stringify({ id: docSnap.id, ...studentData }));
+                    setTimeout(() => { window.location.href = 'penilaian.html'; }, 2000);
+                } else {
+                    statusMessage.textContent = "No. KP anda tidak ditemui dalam rekod. Sila hubungi admin.";
+                    statusMessage.className = "text-sm text-center mt-4 text-red-500";
+                    loginButton.disabled = false;
+                    loginButton.textContent = "Log Masuk";
+                }
+            } catch (error) {
+                console.error("Ralat menyemak No. KP:", error);
+                statusMessage.textContent = "Berlaku ralat. Sila cuba lagi.";
+                statusMessage.className = "text-sm text-center mt-4 text-red-500";
+                loginButton.disabled = false;
+                loginButton.textContent = "Log Masuk";
+            }
+        });
+    </script>
+</body>
+</html>
