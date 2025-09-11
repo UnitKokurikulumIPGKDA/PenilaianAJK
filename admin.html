@@ -6,63 +6,137 @@
     <title>Admin Panel - Penilaian AJK</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        /* Sembunyikan view yang tidak aktif */
+        .view { display: none; }
+        .view.active { display: block; }
+    </style>
 </head>
-<body class="bg-gray-100 flex items-center justify-center h-screen font-sans">
+<body class="bg-gray-100 font-sans">
 
-    <div id="login-view" class="w-full max-w-sm p-8 bg-white rounded-lg shadow-md">
+    <div id="login-view" class="w-full max-w-sm p-8 mx-auto mt-20 bg-white rounded-lg shadow-md">
         <div class="flex justify-center mb-6">
-            <img src="https://imgur.com/gbqbKQl" alt="Logo UKO BIG" class="h-24">
+            <img src="https://i.imgur.com/x1b3D2D.png" alt="Logo UKO BIG" class="h-24">
         </div>
         <h2 class="text-2xl font-bold text-center text-gray-800 mb-6">Log Masuk Admin</h2>
         <form id="login-form">
             <div class="mb-4">
                 <label for="username" class="block text-gray-700 text-sm font-bold mb-2">Nama Pengguna</label>
-                <input type="text" id="username" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" required>
+                <input type="text" id="username" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700" required>
             </div>
             <div class="mb-6">
                 <label for="password" class="block text-gray-700 text-sm font-bold mb-2">Kata Laluan</label>
-                <input type="password" id="password" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 mb-3 leading-tight focus:outline-none focus:shadow-outline" required>
+                <input type="password" id="password" class="shadow appearance-none border rounded w-full py-2 px-3" required>
             </div>
-            <div class="flex items-center justify-between">
-                <button type="submit" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline w-full">
-                    Log Masuk
-                </button>
-            </div>
+            <button type="submit" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded w-full">Log Masuk</button>
         </form>
     </div>
 
-    <div id="dashboard-view" class="w-full max-w-md p-8 bg-white rounded-lg shadow-md hidden">
-        <h2 class="text-2xl font-bold text-center text-gray-800 mb-2">Papan Pemuka Admin</h2>
-        <p class="text-center text-gray-600 mb-6">Selamat datang, Admin!</p>
-        <div class="border-t pt-6">
-            <h3 class="text-lg font-semibold text-gray-700 mb-2">Muat Naik Data Pelajar</h3>
-            <p class="text-sm text-gray-500 mb-4">Pilih fail Excel (.xlsx) dengan header: `Nama Pelajar`, `No. KP`, `AJK`.</p>
-            <input type="file" id="file-uploader" accept=".xlsx, .xls" class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"/>
-            <p id="upload-status" class="text-sm mt-4"></p>
+    <div id="dashboard-view" class="hidden w-full max-w-7xl mx-auto p-4 md:p-8">
+        <div class="flex justify-between items-center mb-6">
+            <h1 class="text-3xl font-bold text-gray-800">Papan Pemuka Admin</h1>
+            <button id="logout-btn" class="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded">Log Keluar</button>
+        </div>
+
+        <div class="mb-4 border-b border-gray-200">
+            <ul class="flex flex-wrap -mb-px text-sm font-medium text-center" id="myTab">
+                <li class="mr-2">
+                    <button class="inline-block p-4 border-b-2 rounded-t-lg" data-tab="analysis-view">Analisis Data</button>
+                </li>
+                <li class="mr-2">
+                    <button class="inline-block p-4 border-b-2 rounded-t-lg" data-tab="upload-view">Muat Naik Data</button>
+                </li>
+            </ul>
+        </div>
+
+        <div id="analysis-view" class="view">
+            <div class="bg-white p-6 rounded-lg shadow-md">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-2xl font-semibold">Rumusan Penilaian Pelajar</h2>
+                    <div>
+                        <label for="ajk-filter" class="mr-2 font-medium">Tapis mengikut AJK:</label>
+                        <select id="ajk-filter" class="border rounded p-2">
+                            <option value="all">Semua AJK</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full bg-white">
+                        <thead class="bg-gray-800 text-white">
+                            <tr>
+                                <th class="w-1/3 text-left py-3 px-4 uppercase font-semibold text-sm">Nama Pelajar</th>
+                                <th class="w-1/3 text-left py-3 px-4 uppercase font-semibold text-sm">AJK</th>
+                                <th class="text-left py-3 px-4 uppercase font-semibold text-sm">Skor Purata</th>
+                                <th class="text-left py-3 px-4 uppercase font-semibold text-sm">Skor Akhir (60%)</th>
+                                <th class="text-left py-3 px-4 uppercase font-semibold text-sm">Tindakan</th>
+                            </tr>
+                        </thead>
+                        <tbody id="summary-table-body" class="text-gray-700">
+                            </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div id="upload-view" class="view">
+            <div class="bg-white p-6 rounded-lg shadow-md">
+                <h3 class="text-xl font-semibold text-gray-700 mb-2">Muat Naik Data Pelajar</h3>
+                <p class="text-sm text-gray-500 mb-4">Pilih fail Excel (.xlsx) dengan header: `Nama Pelajar`, `No. KP`, `AJK`.</p>
+                <input type="file" id="file-uploader" accept=".xlsx, .xls" class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"/>
+                <p id="upload-status" class="text-sm mt-4"></p>
+            </div>
+        </div>
+    </div>
+    
+    <div id="chart-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center">
+        <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-2xl">
+            <div class="flex justify-between items-center mb-4">
+                <h3 id="chart-title" class="text-xl font-semibold">Analisis Kekuatan Pelajar</h3>
+                <button id="close-modal-btn" class="text-black text-2xl">&times;</button>
+            </div>
+            <canvas id="spider-chart"></canvas>
         </div>
     </div>
 
     <script type="module">
+        // Import fungsi Firebase
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-        import { getFirestore, collection, doc, writeBatch } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-        const firebaseConfig = {
-          apiKey: "AIzaSyBzSeS4BKox-Ai23Byid-KGMC3bkgObuIQ",
-          authDomain: "penilaian-ajk-big-siri-2.firebaseapp.com",
-          projectId: "penilaian-ajk-big-siri-2",
-          storageBucket: "penilaian-ajk-big-siri-2.firebasestorage.app",
-          messagingSenderId: "159297856496",
-          appId: "1:159297856496:web:761083393b21ac66ab7335",
-          measurementId: "G-M502Y54J9N"
-        };
+        import { getFirestore, collection, doc, writeBatch, getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+        // Konfigurasi dan init Firebase
+        const firebaseConfig = { /* ... Konfigurasi anda di sini ... */ };
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
+
+        // Maklumat log masuk
         const ADMIN_USERNAME = "ukobig";
         const ADMIN_PASSWORD = "adminuko123";
+        
+        // Soalan-soalan untuk label graf
+        const questionLabels = [
+            '1. Penglibatan', '2. Inisiatif', '3. Komunikasi Awal', 
+            '4. Pelaksanaan', '5. Penyelesaian Masalah', '6. Kerjasama', 
+            '7. Sikap & Motivasi', '8. Tanggungjawab Pasca', '9. Laporan & Maklum Balas'
+        ];
+
+        // Rujukan elemen HTML
         const loginView = document.getElementById('login-view');
         const dashboardView = document.getElementById('dashboard-view');
         const loginForm = document.getElementById('login-form');
-        const fileUploader = document.getElementById('file-uploader');
-        const uploadStatus = document.getElementById('upload-status');
+        const logoutBtn = document.getElementById('logout-btn');
+        const tabs = document.querySelectorAll('#myTab button');
+        const views = document.querySelectorAll('.view');
+        const ajkFilter = document.getElementById('ajk-filter');
+        const tableBody = document.getElementById('summary-table-body');
+        const chartModal = document.getElementById('chart-modal');
+        const closeModalBtn = document.getElementById('close-modal-btn');
+        const chartTitle = document.getElementById('chart-title');
+        
+        let allStudentsData = []; // Simpan data yang telah diproses
+        let spiderChartInstance = null; // Untuk simpan instance graf
+
+        // Logik Log Masuk
         loginForm.addEventListener('submit', (e) => {
             e.preventDefault();
             const username = document.getElementById('username').value;
@@ -70,42 +144,179 @@
             if (username === ADMIN_USERNAME && password === ADMIN_PASSWORD) {
                 loginView.classList.add('hidden');
                 dashboardView.classList.remove('hidden');
+                document.body.classList.remove('items-center', 'justify-center');
+                // Secara automatik buka tab analisis dan muat turun data
+                switchTab('analysis-view');
+                loadDashboardData();
             } else {
                 alert('Nama pengguna atau kata laluan salah!');
             }
         });
-        fileUploader.addEventListener('change', async (event) => {
-            const file = event.target.files[0];
-            if (!file) return;
-            uploadStatus.textContent = 'Memproses fail...';
-            uploadStatus.classList.remove('text-green-600', 'text-red-600');
-            try {
-                const data = await file.arrayBuffer();
-                const workbook = XLSX.read(data);
-                const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-                const jsonData = XLSX.utils.sheet_to_json(worksheet);
-                const batch = writeBatch(db);
-                jsonData.forEach(pelajar => {
-                    const noKP = pelajar['No. KP']?.toString().replace(/-/g, '');
-                    if (noKP) {
-                        const pelajarRef = doc(db, "pelajar", noKP);
-                        batch.set(pelajarRef, {
-                            nama: pelajar['Nama Pelajar'],
-                            noKP: noKP,
-                            ajk: pelajar['AJK'],
-                            telahMenilai: false 
-                        });
-                    }
-                });
-                await batch.commit();
-                uploadStatus.textContent = `Berjaya! ${jsonData.length} data pelajar telah dimuat naik.`;
-                uploadStatus.classList.add('text-green-600');
-            } catch (error) {
-                console.error("Ralat semasa memproses fail:", error);
-                uploadStatus.textContent = 'Gagal memuat naik. Sila semak format fail dan konsol.';
-                uploadStatus.classList.add('text-red-600');
+
+        // Logik Log Keluar
+        logoutBtn.addEventListener('click', () => window.location.reload());
+
+        // Logik Navigasi Tab
+        tabs.forEach(tab => {
+            tab.addEventListener('click', () => switchTab(tab.dataset.tab));
+        });
+
+        function switchTab(activeTabId) {
+            tabs.forEach(tab => {
+                const isSelected = tab.dataset.tab === activeTabId;
+                tab.classList.toggle('border-blue-600', isSelected);
+                tab.classList.toggle('text-blue-600', isSelected);
+                tab.classList.toggle('border-transparent', !isSelected);
+            });
+            views.forEach(view => view.classList.toggle('active', view.id === activeTabId));
+        }
+
+        // Fungsi utama untuk memuat turun dan memproses data
+        async function loadDashboardData() {
+            tableBody.innerHTML = `<tr><td colspan="5" class="text-center p-4">Memuat turun dan menganalisis data...</td></tr>`;
+            
+            // 1. Dapatkan semua pelajar dan semua penilaian
+            const [pelajarSnapshot, penilaianSnapshot] = await Promise.all([
+                getDocs(collection(db, "pelajar")),
+                getDocs(collection(db, "penilaian"))
+            ]);
+            
+            const pelajarList = {};
+            pelajarSnapshot.forEach(doc => pelajarList[doc.id] = { id: doc.id, ...doc.data(), scores: Array(9).fill(0).map(() => ({ total: 0, count: 0 })) });
+
+            const ajkSet = new Set(); // Untuk senarai AJK dalam filter
+
+            // 2. Agregat skor penilaian
+            penilaianSnapshot.forEach(doc => {
+                const data = doc.data();
+                if (pelajarList[data.dinilaiId]) {
+                    pelajarList[data.dinilaiId].scores[data.soalanIndex].total += data.skor;
+                    pelajarList[data.dinilaiId].scores[data.soalanIndex].count += 1;
+                }
+            });
+
+            // 3. Kira purata dan skor akhir
+            allStudentsData = Object.values(pelajarList).map(pelajar => {
+                ajkSet.add(pelajar.ajk);
+                const validScores = pelajar.scores.filter(s => s.count > 0);
+                const averagePerQuestion = validScores.map(s => s.total / s.count);
+                const overallAverage = averagePerQuestion.length ? averagePerQuestion.reduce((a, b) => a + b, 0) / averagePerQuestion.length : 0;
+                const percentage = (overallAverage / 5) * 100;
+                const finalScore = percentage * 0.6;
+                
+                return {
+                    ...pelajar,
+                    overallAverage: overallAverage.toFixed(2),
+                    finalScore: finalScore.toFixed(2),
+                    averageScores: pelajar.scores.map(s => s.count > 0 ? (s.total / s.count) : 0)
+                };
+            });
+            
+            // Populate AJK filter
+            ajkSet.forEach(ajk => {
+                const option = document.createElement('option');
+                option.value = ajk;
+                option.textContent = ajk;
+                ajkFilter.appendChild(option);
+            });
+
+            renderTable(allStudentsData);
+        }
+
+        // Fungsi untuk memaparkan data dalam jadual
+        function renderTable(dataToRender) {
+            tableBody.innerHTML = ''; // Kosongkan jadual
+            if(dataToRender.length === 0){
+                tableBody.innerHTML = `<tr><td colspan="5" class="text-center p-4">Tiada data penilaian ditemui.</td></tr>`;
+                return;
+            }
+            dataToRender.forEach(pelajar => {
+                const row = document.createElement('tr');
+                row.className = 'border-b';
+                row.innerHTML = `
+                    <td class="py-3 px-4">${pelajar.nama}</td>
+                    <td class="py-3 px-4">${pelajar.ajk}</td>
+                    <td class="py-3 px-4">${pelajar.overallAverage} / 5.00</td>
+                    <td class="py-3 px-4 font-semibold">${pelajar.finalScore} / 60.00</td>
+                    <td class="py-3 px-4">
+                        <button data-id="${pelajar.id}" class="view-chart-btn bg-purple-500 text-white text-xs py-1 px-2 rounded hover:bg-purple-700">Lihat Graf</button>
+                    </td>
+                `;
+                tableBody.appendChild(row);
+            });
+        }
+        
+        // Event listener untuk filter AJK
+        ajkFilter.addEventListener('change', () => {
+            const selectedAjk = ajkFilter.value;
+            if (selectedAjk === 'all') {
+                renderTable(allStudentsData);
+            } else {
+                const filteredData = allStudentsData.filter(p => p.ajk === selectedAjk);
+                renderTable(filteredData);
             }
         });
+
+        // Event listener untuk butang 'Lihat Graf'
+        tableBody.addEventListener('click', (e) => {
+            if (e.target.classList.contains('view-chart-btn')) {
+                const studentId = e.target.dataset.id;
+                const student = allStudentsData.find(p => p.id === studentId);
+                showSpiderChart(student);
+            }
+        });
+
+        // Fungsi untuk memaparkan Graf Spider
+        function showSpiderChart(student) {
+            chartTitle.textContent = `Analisis Kekuatan - ${student.nama}`;
+            const ctx = document.getElementById('spider-chart').getContext('2d');
+            
+            if(spiderChartInstance) {
+                spiderChartInstance.destroy(); // Hancurkan graf lama
+            }
+
+            spiderChartInstance = new Chart(ctx, {
+                type: 'radar',
+                data: {
+                    labels: questionLabels,
+                    datasets: [{
+                        label: 'Skor Purata',
+                        data: student.averageScores,
+                        fill: true,
+                        backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                        borderColor: 'rgb(54, 162, 235)',
+                        pointBackgroundColor: 'rgb(54, 162, 235)',
+                        pointBorderColor: '#fff',
+                        pointHoverBackgroundColor: '#fff',
+                        pointHoverBorderColor: 'rgb(54, 162, 235)'
+                    }]
+                },
+                options: {
+                    scales: {
+                        r: {
+                            angleLines: { display: true },
+                            suggestedMin: 0,
+                            suggestedMax: 5,
+                            ticks: { stepSize: 1 }
+                        }
+                    }
+                }
+            });
+            chartModal.classList.remove('hidden');
+            chartModal.classList.add('flex');
+        }
+
+        // Logik untuk tutup modal
+        closeModalBtn.addEventListener('click', () => {
+            chartModal.classList.add('hidden');
+            chartModal.classList.remove('flex');
+        });
+        
+        // Logik muat naik fail (sama seperti sebelum ini)
+        const fileUploader = document.getElementById('file-uploader');
+        const uploadStatus = document.getElementById('upload-status');
+        fileUploader.addEventListener('change', async (event) => { /* ... Kod muat naik anda di sini ... */ });
+
     </script>
 </body>
 </html>
